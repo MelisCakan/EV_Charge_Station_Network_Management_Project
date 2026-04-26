@@ -1,0 +1,92 @@
+# ========================
+# Python / Backend
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+venv/
+.venv/
+env/
+*.pyo
+
+# ========================
+# Node / Frontend
+# ========================
+node_modules/
+.next/
+out/
+.turbo/
+.vercel/
+.pnp/
+.pnp.js
+.yarn/install-state.gz
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+coverage/
+
+# ========================
+# Environment & Secrets
+# ========================
+.env
+.env.*
+!.env.example
+*.pem
+
+# ========================
+# OS
+# ========================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ========================
+# IDE / Editor
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# ========================
+# Backup & Temp Files
+# ========================
+*.bak
+*.bkp
+*.backup
+*.tmp
+*_BACKUP*
+._*
+.$*
+
+# ========================
+# Logs
+# ========================
+*.log
+
+# ========================
+# Project-specific ignores
+# ========================
+# Lecture slides (not part of deliverable)
+ekstra bakılacak slaytlar/
+
+# Old planning files and previous chat data
+Planlama ve önceki chatteki veriler/
+
+# Report PDFs and submitted documents
+Proje dosyaları/
+
+# Claude Code local config
+.claude/

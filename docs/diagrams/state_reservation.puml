@@ -1,0 +1,36 @@
+@startuml state_reservation
+!theme plain
+title Reservation State Machine\n(Sommerville Ch.5)
+
+[*] --> Confirmed : Kullanici rezervasyon olusturur\n/ uyumluluk + zaman kontrolleri yapilir
+
+Confirmed --> Cancelled : Kullanici iptal eder (REQ 1.18)\n/ >=30dk once: %100 iade\n/ <30dk once: %80 iade (%20 ceza)
+Confirmed --> Cancelled : Charger offline olur (UC3)\n/ otomatik iptal + %100 iade (REQ 2.4)
+Confirmed --> NoShow : 15 dk icinde session baslatilmaz (REQ 1.19)\n/ otomatik iptal + %50 ceza
+Confirmed --> Completed : Sarj oturumu baslar\nve tamamlanir\n/ oturum kaydi + odeme yapilir
+
+NoShow --> [*]
+
+state Confirmed #90EE90
+state Cancelled #FF6B6B
+state NoShow #FFA500
+state Completed #87CEEB
+
+note right of Confirmed
+  Kontroller:
+  1. Konnektor uyumluluk (CCS/CHAdeMO/Type2) (REQ 7.2)
+  2. Maks 2 saat sure siniri (REQ 1.9)
+  3. Maks 24 saat onceden
+  4. Cakisma engeli (double-booking)
+end note
+
+note bottom of NoShow
+  REQ 1.19: No-Show Politikasi
+  Baslangic saatinden 15 dk sonra
+  session baslatilmamissa:
+  - Rezervasyon otomatik iptal
+  - %50 ceza (tahmini oturum maliyetinin)
+  - Charger slot serbest birakilir
+end note
+
+@enduml

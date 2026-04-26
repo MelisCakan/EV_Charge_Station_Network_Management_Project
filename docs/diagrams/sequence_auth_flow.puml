@@ -1,0 +1,78 @@
+@startuml sequence_auth_flow
+!theme plain
+title Auth Flow - Register & Login
+
+actor "EVDriver /\nOperator / Admin" as user
+participant "Frontend\n(Next.js)" as fe
+participant "auth_router\n(Layer 2)" as router
+participant "security.py\n(Core)" as sec
+participant "Database\n(Layer 4)" as db
+
+== REGISTER ==
+user -> fe : Kayit formunu doldurur\n(email, password, full_name, phone, role)
+fe -> router : POST /auth/register\n{email, password, full_name, phone_number}
+router -> sec : hash_password(password)
+sec --> router : password_hash (bcrypt)
+router -> db : INSERT INTO users\n(email, password_hash, full_name, role='driver')
+db --> router : user_id
+router -> db : INSERT INTO wallets\n(user_id, balance=0)
+db --> router : wallet_id
+router --> fe : 201 Created\n{user_id, email, role}
+fe --> user : "Kayit basarili! Giris yapabilirsiniz."
+
+== LOGIN ==
+user -> fe : Email + Password girer
+fe -> router : POST /auth/login\n{email, password}
+router -> db : SELECT * FROM users\nWHERE email = ?
+db --> router : user record
+router -> sec : verify_password(password, hash)
+sec --> router : True / False
+
+alt Password Dogru
+  router -> sec : create_access_token\n(user_id, role, exp=24h)
+  sec --> router : JWT token
+  router --> fe : 200 OK\n{access_token, token_type: "bearer"}
+  fe -> fe : localStorage.setItem("token", jwt)
+  fe --> user : Dashboard'a yonlendirilir\n(role'e gore: driver/operator/admin)
+else Password Yanlis
+  router --> fe : 401 Unauthorized\n"Gecersiz email veya sifre"
+  fe --> user : Hata mesaji gosterilir
+end
+
+== PASSWORD RESET (REQ 1.17) ==
+user -> fe : "Sifremi Unuttum" tiklar
+fe -> router : POST /auth/password-reset-request\n{email}
+router -> db : SELECT * FROM users\nWHERE email = ?
+db --> router : user record
+
+alt Kullanici Bulundu
+  router -> router : Reset token olustur\n(15 dk gecerli)
+  router -> db : UPDATE users SET\nreset_token, reset_token_expires
+  router --> fe : 200 OK\n"Sifirlama linki gonderildi"
+  fe --> user : "E-postanizi kontrol edin"
+
+  user -> fe : Reset linkine tiklar\nYeni sifre girer
+  fe -> router : POST /auth/password-reset\n{token, new_password}
+  router -> db : SELECT * FROM users\nWHERE reset_token = ?\nAND reset_token_expires > now()
+  db --> router : user record (valid token)
+  router -> sec : hash_password(new_password)
+  sec --> router : password_hash
+  router -> db : UPDATE users SET\npassword_hash, reset_token=NULL
+  router --> fe : 200 OK "Sifre guncellendi"
+  fe --> user : "Sifreniz degistirildi.\nGiris yapabilirsiniz."
+else Kullanici Bulunamadi
+  router --> fe : 200 OK\n"Sifirlama linki gonderildi"
+  note right : Guvenlik icin ayni yanit\n(email enumeration onleme)
+end
+
+== AUTHENTICATED REQUEST ==
+user -> fe : Korunmus sayfaya erisir
+fe -> router : GET /vehicles\nAuthorization: Bearer <JWT>
+router -> sec : verify_token(jwt)
+sec --> router : {user_id, role}
+router -> db : SELECT * FROM vehicles\nWHERE user_id = ?
+db --> router : vehicle list
+router --> fe : 200 OK [{vehicles}]
+fe --> user : Arac listesi gosterilir
+
+@enduml

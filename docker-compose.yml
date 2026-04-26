@@ -1,0 +1,52 @@
+services:
+  # ── Layer 4: PostgreSQL Database ──
+  db:
+    image: postgres:16-alpine
+    container_name: ev_charging_db
+    environment:
+      POSTGRES_USER: ev_user
+      POSTGRES_PASSWORD: ev_password
+      POSTGRES_DB: ev_charging
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ev_user -d ev_charging"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── Layer 2-3: FastAPI Backend ──
+  backend:
+    build: ./backend
+    container_name: ev_charging_backend
+    entrypoint: ["bash", "/app/entrypoint.sh"]
+    command: ["--reload"]
+    environment:
+      DATABASE_URL: postgresql://ev_user:ev_password@db:5432/ev_charging
+      SECRET_KEY: dev-secret-key-change-in-production
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Layer 1: Next.js Frontend ──
+  frontend:
+    build: ./frontend
+    container_name: ev_charging_frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

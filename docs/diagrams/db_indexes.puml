@@ -1,0 +1,136 @@
+@startuml db_indexes
+!theme plain
+title Database Indexes & Query Optimization Strategy
+
+skinparam note {
+  BackgroundColor #FFF9C4
+}
+
+object "users" as users {
+  <b>PRIMARY KEY</b>: id
+  <b>UNIQUE INDEX</b>: email
+  <b>INDEX</b>: role
+  --
+  Sorgular:
+  - Login: WHERE email = ?
+  - Role check: WHERE role = ?
+}
+
+object "vehicles" as vehicles {
+  <b>PRIMARY KEY</b>: id
+  <b>INDEX</b>: user_id (FK)
+  <b>UNIQUE INDEX</b>: plate_number
+  --
+  Sorgular:
+  - Kullanicinin araclari: WHERE user_id = ?
+  - Plaka kontrolu: WHERE plate_number = ?
+}
+
+object "charging_stations" as stations {
+  <b>PRIMARY KEY</b>: id
+  <b>INDEX</b>: (latitude, longitude)
+  <b>INDEX</b>: status
+  <b>INDEX</b>: city
+  --
+  Sorgular:
+  - Yakin istasyonlar: WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?
+  - Aktif istasyonlar: WHERE status = 'active'
+}
+
+object "chargers" as chargers {
+  <b>PRIMARY KEY</b>: id
+  <b>INDEX</b>: station_id (FK)
+  <b>INDEX</b>: (connector_type, status)
+  <b>INDEX</b>: status
+  --
+  Sorgular:
+  - Istasyonun charger'lari: WHERE station_id = ?
+  - Filtreleme: WHERE connector_type = ? AND status = 'available'
+}
+
+object "reservations" as reservations {
+  <b>PRIMARY KEY</b>: id
+  <b>INDEX</b>: user_id (FK)
+  <b>INDEX</b>: charger_id (FK)
+  <b>INDEX</b>: (charger_id, date, status)
+  <b>INDEX</b>: (user_id, status)
+  --
+  Sorgular:
+  - Cakisma kontrolu: WHERE charger_id = ? AND date = ? AND status = 'confirmed'
+  - Kullanicinin rez'lari: WHERE user_id = ? AND status = ?
+}
+
+object "charging_sessions" as sessions {
+  <b>PRIMARY KEY</b>: id
+  <b>UNIQUE INDEX</b>: reservation_id (FK)
+  <b>INDEX</b>: status
+  --
+  Sorgular:
+  - Aktif oturumlar: WHERE status = 'active'
+  - Rez->Oturum: WHERE reservation_id = ?
+}
+
+object "wallets" as wallets {
+  <b>PRIMARY KEY</b>: id
+  <b>UNIQUE INDEX</b>: user_id (FK)
+  --
+  Sorgular:
+  - Bakiye sorgulama: WHERE user_id = ?
+}
+
+object "transactions" as transactions {
+  <b>PRIMARY KEY</b>: id
+  <b>INDEX</b>: wallet_id (FK)
+  <b>INDEX</b>: (wallet_id, timestamp DESC)
+  <b>INDEX</b>: session_id (FK)
+  --
+  Sorgular:
+  - Islem gecmisi: WHERE wallet_id = ? ORDER BY timestamp DESC
+}
+
+object "digital_receipts" as receipts {
+  <b>PRIMARY KEY</b>: id
+  <b>UNIQUE INDEX</b>: session_id (FK)
+  --
+  Sorgular:
+  - Makbuz: WHERE session_id = ?
+}
+
+object "issue_reports" as issues {
+  <b>PRIMARY KEY</b>: id
+  <b>INDEX</b>: charger_id (FK)
+  <b>INDEX</b>: (status, reported_at DESC)
+  --
+  Sorgular:
+  - Charger arizalari: WHERE charger_id = ?
+  - Acik arizalar: WHERE status = 'open' ORDER BY reported_at DESC
+}
+
+object "favorite_stations" as favorites {
+  <b>PRIMARY KEY</b>: id
+  <b>UNIQUE INDEX</b>: (user_id, station_id)
+  --
+  Sorgular:
+  - Favoriler: WHERE user_id = ?
+}
+
+object "notifications" as notifications {
+  <b>PRIMARY KEY</b>: id
+  <b>INDEX</b>: (user_id, is_read, sent_at DESC)
+  --
+  Sorgular:
+  - Okunmamis: WHERE user_id = ? AND is_read = false ORDER BY sent_at DESC
+}
+
+note as N1
+  <b>Performans Notlari:</b>
+  - Konum bazli sorgular icin PostGIS extension
+    veya bounding box + Haversine formulu
+  - Cakisma kontrolu icin composite index
+    (charger_id, date, status)
+  - Transaction gecmisi icin covering index
+    (wallet_id, timestamp DESC)
+  - Connection pooling: SQLModel async session
+end note
+
+@enduml

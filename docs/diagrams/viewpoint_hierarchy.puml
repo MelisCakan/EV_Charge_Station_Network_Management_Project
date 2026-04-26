@@ -1,0 +1,26 @@
+@startuml viewpoint_hierarchy
+!theme plain
+title Viewpoint Hierarchy\n(Sommerville Ch.4 - Viewpoint-oriented Elicitation)
+
+package "All Viewpoints" {
+  package "Interactor VPs\n(Sistemle dogrudan etkilesim)" #E8F5E9 {
+    rectangle "VP1: EV Drivers\n---\nRegister Vehicles\nDiscover Stations\nReserve Slots" as vp1
+    rectangle "VP2: Station Operators\n---\nMaintain Availability\nHandle Technical Issues" as vp2
+    rectangle "VP3: System Administrators\n---\nOversee Network\nAnalyze & Manage" as vp3
+    rectangle "VP4: Map Service Providers\n---\nGeolocation\nReal-time Mapping\nNavigation" as vp4
+  }
+
+  package "Indirect VPs\n(Sistemi etkileyen dis servisler)" #E3F2FD {
+    rectangle "VP5: Payment Service Providers\n---\nProcess Transactions\nManage Secure Wallet" as vp5
+    rectangle "VP6: Electric Grid Providers\n---\nMonitor Demand\nEnsure Infrastructure Stability" as vp6
+  }
+
+  package "Domain VPs\n(Uyum gereken standartlar)" #FFF3E0 {
+    rectangle "VP7: Charging Standards\n---\nPhysical & Electrical\nConnector Compatibility" as vp7
+    rectangle "VP8: Communication Protocols\n---\nStandardized Data Exchange\nOCPP Compliance" as vp8
+    rectangle "VP9: Privacy & Security Regulations\n---\nData Protection\nLegal & Industry Mandates" as vp9
+  }
+
+}
+
+@enduml

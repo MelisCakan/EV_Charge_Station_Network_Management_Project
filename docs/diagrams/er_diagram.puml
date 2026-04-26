@@ -1,0 +1,286 @@
+@startuml er_diagram
+!theme plain
+title EV Charging Station Network Management System\nER Diagram (Elmasri & Navathe Notation)
+
+skinparam {
+  BackgroundColor transparent
+  Shadowing false
+}
+skinparam rectangle {
+  roundCorner 0
+  BackgroundColor #FFFDE7
+  BorderColor #333333
+  FontStyle bold
+  FontSize 12
+}
+skinparam hexagon {
+  BackgroundColor #BBDEFB
+  BorderColor #1565C0
+  FontSize 10
+}
+skinparam usecase {
+  BackgroundColor #FFFFFF
+  BorderColor #999999
+  FontSize 8
+}
+skinparam circle {
+  BackgroundColor #E0E0E0
+  BorderColor #333333
+}
+skinparam nodesep 40
+skinparam ranksep 45
+
+' ==============================================
+'  EER GENERALIZATION (Disjoint, Total)
+' ==============================================
+rectangle "EV_DRIVER" as DRIVER #FFF9C4
+rectangle "STATION\nOPERATOR" as OPER #FFF9C4
+rectangle "SYSTEM\nADMIN" as ADMIN_E #FFF9C4
+circle "d" as GEN
+
+GEN -up- DRIVER
+GEN -up- OPER
+GEN -up- ADMIN_E
+
+' ==============================================
+'  ENTITY TYPES
+' ==============================================
+rectangle "USER" as USER
+rectangle "VEHICLE" as VEHICLE
+rectangle "WALLET" as WALLET
+rectangle "CHARGING\nSTATION" as STATION
+rectangle "CHARGER" as CHARGER
+rectangle "RESERVATION" as RESERV
+rectangle "CHARGING\nSESSION" as SESSION
+rectangle "DIGITAL\nRECEIPT" as RECEIPT
+rectangle "TRANSACTION" as TXN
+rectangle "NOTIFICATION" as NOTIF
+rectangle "ISSUE\nREPORT" as ISSUE
+rectangle "MAINTENANCE\nNOTE" as MNOTE
+rectangle "REPORT" as RPORT
+
+' ==============================================
+'  RELATIONSHIP TYPES (Hexagon ~ Diamond)
+' ==============================================
+hexagon "OWNS" as R1
+hexagon "HAS" as R2
+hexagon "MAKES" as R3
+hexagon "USED\nIN" as R4
+hexagon "RESERVED\nFOR" as R5
+hexagon "CONTAINS" as R6
+hexagon "INITIATES" as R7
+hexagon "PRODUCES" as R8
+hexagon "GENERATES" as R9
+hexagon "RECORDS" as R10
+hexagon "RECEIVES" as R11
+hexagon "SUBMITS" as R12
+hexagon "REPORTED\nFOR" as R13
+hexagon "HAS\nNOTES" as R14
+hexagon "WRITES" as R15
+hexagon "FAVORITES" as R16
+hexagon "CREATES" as R17
+
+' ==============================================
+'  ATTRIBUTES (Ovals)
+' ==============================================
+usecase "<u>id</u>" as u1
+usecase "email" as u2
+usecase "role" as u3
+usecase "full_name" as u4
+
+usecase "<u>id</u>" as v1
+usecase "plate_number" as v2
+usecase "connector_type" as v3
+
+usecase "<u>id</u>" as w1
+usecase "balance" as w2
+
+usecase "<u>id</u>" as s1
+usecase "name" as s2
+usecase "location" as s3
+
+usecase "<u>id</u>" as c1
+usecase "status" as c2
+usecase "connector_type" as c3
+usecase "pricing_per_kwh" as c4
+
+usecase "<u>id</u>" as re1
+usecase "date" as re2
+usecase "status" as re3
+
+usecase "<u>id</u>" as ss1
+usecase "total_cost" as ss2
+usecase "energy_consumed" as ss3
+
+usecase "<u>id</u>" as dr1
+usecase "total_amount" as dr2
+
+usecase "<u>id</u>" as tx1
+usecase "amount" as tx2
+usecase "type" as tx3
+
+usecase "<u>id</u>" as n1
+usecase "message" as n2
+
+usecase "<u>id</u>" as ir1
+usecase "category" as ir2
+usecase "status" as ir3
+
+usecase "<u>id</u>" as mn1
+usecase "content" as mn2
+
+usecase "<u>id</u>" as rp1
+usecase "type" as rp2
+
+usecase "added_at" as fa1
+
+' ==============================================
+'  ATTRIBUTE CONNECTIONS
+' ==============================================
+USER -up- u1
+USER -up- u2
+USER -up- u3
+USER -up- u4
+
+VEHICLE -up- v1
+VEHICLE -up- v2
+VEHICLE -up- v3
+
+WALLET -left- w1
+WALLET -left- w2
+
+STATION -up- s1
+STATION -up- s2
+STATION -up- s3
+
+CHARGER -right- c1
+CHARGER -right- c2
+CHARGER -right- c3
+CHARGER -right- c4
+
+RESERV -left- re1
+RESERV -left- re2
+RESERV -left- re3
+
+SESSION -left- ss1
+SESSION -left- ss2
+SESSION -left- ss3
+
+RECEIPT -left- dr1
+RECEIPT -left- dr2
+
+TXN -right- tx1
+TXN -right- tx2
+TXN -right- tx3
+
+NOTIF -right- n1
+NOTIF -right- n2
+
+ISSUE -left- ir1
+ISSUE -left- ir2
+ISSUE -left- ir3
+
+MNOTE -right- mn1
+MNOTE -right- mn2
+
+RPORT -right- rp1
+RPORT -right- rp2
+
+R16 -down- fa1
+
+' ==============================================
+'  GENERALIZATION
+' ==============================================
+USER -up- GEN
+
+' ==============================================
+'  RELATIONSHIP CONNECTIONS (1, N, M notation)
+' ==============================================
+
+' 1) USER --OWNS-- VEHICLE (1:N)
+USER "1" -down- R1
+R1 -down- "N" VEHICLE
+
+' 2) USER --HAS-- WALLET (1:1)
+USER "1" -down- R2
+R2 -down- "1" WALLET
+
+' 3) USER --MAKES-- RESERVATION (1:N)
+USER "1" -down- R3
+R3 -down- "N" RESERV
+
+' 4) VEHICLE --USED_IN-- RESERVATION (1:N)
+VEHICLE "1" -down- R4
+R4 -right- "N" RESERV
+
+' 5) CHARGER --RESERVED_FOR-- RESERVATION (1:N)
+CHARGER "1" -down- R5
+R5 -left- "N" RESERV
+
+' 6) STATION --CONTAINS-- CHARGER (1:N)
+STATION "1" -down- R6
+R6 -down- "N" CHARGER
+
+' 7) RESERVATION --INITIATES-- SESSION (1:1)
+RESERV "1" -down- R7
+R7 -down- "1" SESSION
+
+' 8) SESSION --PRODUCES-- RECEIPT (1:1)
+SESSION "1" -down- R8
+R8 -down- "1" RECEIPT
+
+' 9) SESSION --GENERATES-- TRANSACTION (1:N)
+SESSION "1" -down- R9
+R9 -down- "N" TXN
+
+' 10) WALLET --RECORDS-- TRANSACTION (1:N)
+WALLET "1" -down- R10
+R10 -down- "N" TXN
+
+' 11) USER --RECEIVES-- NOTIFICATION (1:N)
+USER "1" -right- R11
+R11 -right- "N" NOTIF
+
+' 12) USER --SUBMITS-- ISSUE_REPORT (1:N)
+USER "1" -left- R12
+R12 -left- "N" ISSUE
+
+' 13) CHARGER --REPORTED_FOR-- ISSUE (1:N)
+CHARGER "1" -- R13
+R13 -- "N" ISSUE
+
+' 14) ISSUE --HAS_NOTES-- MNOTE (1:N)
+ISSUE "1" -down- R14
+R14 -down- "N" MNOTE
+
+' 15) USER --WRITES-- MNOTE (1:N)
+USER "1" -- R15
+R15 -- "N" MNOTE
+
+' 16) USER --FAVORITES-- STATION (M:N)
+USER "M" -right- R16
+R16 -right- "N" STATION
+
+' 17) USER --CREATES-- REPORT (1:N)
+USER "1" -left- R17
+R17 -left- "N" RPORT
+
+' ==============================================
+'  LAYOUT HINTS
+' ==============================================
+VEHICLE -[hidden]right- WALLET
+RECEIPT -[hidden]right- TXN
+NOTIF -[hidden]down- STATION
+
+legend bottom right
+  |= Sembol |= Anlam |
+  | Rectangle | Entity Type |
+  | Hexagon (~Diamond) | Relationship Type |
+  | Oval | Attribute |
+  | <u>Underline</u> | Primary Key |
+  | Circle "d" | Disjoint Generalization |
+  | 1 | One |
+  | N, M | Many |
+end legend
+
+@enduml

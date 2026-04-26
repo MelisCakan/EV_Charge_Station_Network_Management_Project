@@ -1,0 +1,51 @@
+@startuml deployment
+!theme plain
+title Deployment Diagram\nClient-Server Architecture (Ch.6, Slide 28)
+
+node "CLIENT SIDE" as client_side #E3F2FD {
+  node "Web Browser" as browser {
+    component "Next.js Frontend\n(SSR + CSR)" as nextjs
+    component "Google Maps JS\nAPI Client" as gmaps_client
+  }
+}
+
+node "SERVER SIDE" as server_side #FFF8E1 {
+  node "Backend Server" as backend {
+    component "FastAPI\n(Uvicorn ASGI)" as fastapi
+    component "SQLModel ORM" as orm
+    component "Alembic\n(Migrations)" as alembic
+  }
+
+  database "PostgreSQL" as db {
+    storage "13 tables\n(16 domain classes)" as tables
+  }
+}
+
+cloud "External Services" as ext {
+  component "Google Maps\nPlatform API" as gmaps_api
+  component "OCPP Hardware\n(Simulated)" as ocpp
+}
+
+nextjs -down-> fastapi : HTTP/REST API\n(JSON over HTTPS)\nJWT Bearer Token
+gmaps_client -right-> gmaps_api : Maps JS API
+fastapi -down-> orm
+orm -down-> db : SQL (Connection Pool)
+alembic -down-> db : DDL migrations
+fastapi ..> ocpp : OCPP 1.6/2.0 (Simulated)
+
+note bottom of client_side
+  <b>Client (Ch.6, Slide 28)</b>
+  - Browser'da calisir
+  - UI rendering, kullanici etkilesimi
+  - Dev: npm run dev (port 3000)
+end note
+
+note bottom of server_side
+  <b>Server (Ch.6, Slide 28)</b>
+  - Backend sunucuda calisir
+  - Layered Architecture (4 katman)
+  - Dev: uvicorn (port 8000)
+  - DB: docker postgres:16 (port 5432)
+end note
+
+@enduml

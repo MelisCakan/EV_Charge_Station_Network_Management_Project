@@ -1,0 +1,106 @@
+@startuml sequence_uc2_charging
+!theme plain
+title UC2: Charging Session Tracking and Automated Payment
+
+actor "EV Driver" as driver
+participant "Frontend\n(Next.js)" as fe
+participant "session_router\n(Layer 2)" as ses_r
+participant "session_service\n(Layer 3)" as ses_s
+participant "wallet_service\n(Layer 3)" as wal_s
+participant "notification_service\n(Layer 3)" as not_s
+participant "Database\n(Layer 4)" as db
+
+== 1. START CHARGING SESSION (REQ 1.21: QR Dogrulama) ==
+driver -> fe : Charger'daki QR kodu tarar
+fe -> ses_r : POST /sessions/start\n{reservation_id, charger_qr_code}
+ses_r -> ses_s : start_session(reservation_id, qr_code)
+
+ses_s -> db : SELECT FROM reservations\nWHERE id = ? AND status = 'confirmed'
+db --> ses_s : reservation (valid)
+
+ses_s -> db : SELECT FROM chargers\nWHERE qr_code = ?
+db --> ses_s : charger record
+
+note right of ses_s
+  QR Dogrulama (REQ 1.21):
+  reservation.charger_id == charger.id
+  Eslesmezse → 400 "QR kod uyumsuz"
+  (Prototipte charger_id ile simule)
+end note
+
+ses_s -> db : UPDATE chargers SET status = 'occupied'\nWHERE id = charger_id
+ses_s -> db : INSERT INTO charging_sessions\n(reservation_id, start_battery_level=20,\nstatus='active', started_at=now())
+db --> ses_s : session record
+
+ses_s --> ses_r : session started
+ses_r --> fe : 201 {session_id, start_battery_level: 20}
+fe --> driver : Sarj dashboard acilir\n(Dynamic Information Display)
+
+== 2. REAL-TIME PROGRESS (Polling every 5s) ==
+loop Her 5 saniyede
+  fe -> ses_r : GET /sessions/{id}/progress
+  ses_r -> ses_s : get_progress(session_id)
+  ses_s -> db : SELECT FROM charging_sessions\nWHERE id = ?
+  db --> ses_s : current session data
+  ses_s --> ses_r : {current_battery: 55%,\nenergy_consumed: 26.25 kWh,\nestimated_remaining: "18 min",\ncost_so_far: 105.0 TL}
+  ses_r --> fe : progress data
+  fe --> driver : Progress bar guncellenir\n(Analogue: dairesel bar + Digital: kWh/TL)
+end
+
+== 3. COMPLETE CHARGING ==
+alt Kullanici Manuel Tamamlar
+  driver -> fe : "Sarji Tamamla" butonuna basar
+else 2 Saat Doldu (REQ 1.9)
+  ses_s -> ses_s : auto_complete timer\n(2 saat doldu)
+  ses_s -> not_s : send_notification(user_id,\n"2 saat siniri doldu,\nsarj otomatik tamamlandi",\n"session_timeout")
+end
+fe -> ses_r : POST /sessions/{id}/complete
+ses_r -> ses_s : complete_session(session_id)
+
+ses_s -> db : UPDATE charging_sessions SET\nend_battery_level = 80,\nenergy_consumed = 45.0,\ntotal_cost = 180.0,\nstatus = 'completed',\ncompleted_at = now()
+
+note right of ses_s
+  Maliyet Hesaplama:
+  energy_consumed = 45 kWh
+  pricing_per_kwh = 4 TL
+  total_cost = 45 * 4 = 180 TL
+end note
+
+== 4. AUTOMATED PAYMENT ==
+ses_s -> wal_s : deduct(user_id, 180.0)
+wal_s -> db : SELECT balance FROM wallets\nWHERE user_id = ?
+db --> wal_s : balance = 500.0
+
+alt Bakiye Yeterli
+  wal_s -> db : UPDATE wallets SET balance = 320.0
+  wal_s -> db : INSERT INTO transactions\n(wallet_id, amount=-180, type='charge',\nsession_id, status='completed')
+  db --> wal_s : transaction record
+
+  alt Bakiye < 50 TL (REQ 1.15)
+    wal_s -> not_s : send_notification(user_id,\n"Bakiyeniz 50 TL altinda", "low_balance")
+    not_s -> db : INSERT INTO notifications
+  end
+
+  wal_s --> ses_s : payment success
+else Bakiye Yetersiz
+  wal_s --> ses_s : InsufficientBalance error
+  ses_s --> ses_r : 400 "Yetersiz bakiye"
+end
+
+== 5. DIGITAL RECEIPT ==
+ses_s -> db : INSERT INTO digital_receipts\n(session_id, issued_at=now(),\ntotal_amount=180, energy_consumed=45,\nunit_price=4)
+db --> ses_s : receipt record
+
+== 6. UPDATE STATES ==
+ses_s -> db : UPDATE reservations SET status='completed'
+ses_s -> db : UPDATE chargers SET status='available'
+
+== 7. NOTIFICATION ==
+ses_s -> not_s : send_receipt(user_id, session)
+not_s -> db : INSERT INTO notifications\n(user_id, message="Sarj tamamlandi.\n45 kWh, 180 TL", type="charging_complete")
+
+ses_s --> ses_r : session completed
+ses_r --> fe : 200 {session, receipt, transaction}
+fe --> driver : "Sarj tamamlandi!\n45 kWh | 180 TL\nKalan bakiye: 320 TL"
+
+@enduml

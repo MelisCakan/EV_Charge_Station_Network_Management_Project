@@ -1,0 +1,75 @@
+@startuml sequence_uc1_reservation
+!theme plain
+title UC1: Charging Reservation with Vehicle-Charger Compatibility Check
+
+actor "EV Driver" as driver
+participant "Frontend\n(Next.js)" as fe
+participant "vehicle_router\n(Layer 2)" as veh_r
+participant "station_router\n(Layer 2)" as sta_r
+participant "reservation_router\n(Layer 2)" as rez_r
+participant "compatibility_service\n(Layer 3)" as comp_s
+participant "reservation_service\n(Layer 3)" as rez_s
+participant "map_router\n(Layer 2)" as map_r
+participant "Database\n(Layer 4)" as db
+participant "Google Maps\nAPI" as gmaps
+
+== 1. VEHICLE REGISTRATION (Form Fill-in) ==
+driver -> fe : Arac bilgilerini girer\n(brand, model, battery, connector, plate)
+fe -> veh_r : POST /vehicles\n{brand:"Tesla", model:"Model 3",\nbattery_capacity:75, connector_type:"CCS",\nplate_number:"35 EV 2024"}
+veh_r -> db : INSERT INTO vehicles
+db --> veh_r : vehicle record
+veh_r --> fe : 201 Created {vehicle}
+fe --> driver : "Arac basariyla kaydedildi"
+
+== 2. STATION SEARCH ON MAP (Direct Manipulation) ==
+driver -> fe : Haritada istasyon arar
+fe -> map_r : GET /map/stations?lat=38.42&lng=27.14&radius=10
+map_r -> db : SELECT stations + chargers\nWHERE distance < radius
+db --> map_r : station list with charger status
+map_r --> fe : [{station, chargers, distance}]
+fe -> gmaps : Marker'lari goster\n(yesil=available, sari=occupied, kirmizi=offline)
+fe --> driver : Haritada istasyonlar goruntulenir
+
+== 3. SELECT STATION & CHARGER (Menu Selection) ==
+driver -> fe : Karsiyaka Hub istasyonunu secer
+fe -> sta_r : GET /stations/{id}/chargers
+sta_r -> db : SELECT * FROM chargers\nWHERE station_id = ?
+db --> sta_r : charger list
+sta_r --> fe : [{chargerID, chargerType:"DC",\npowerOutput:50, connectorType:"CCS",\npricingPerKWh:4, status:"available"}]
+fe --> driver : Charger listesi gosterilir\nDriver "DC 50kW #03" secer
+
+== 4. CREATE RESERVATION ==
+driver -> fe : Tarih ve saat secer\n(2026-01-15, 14:00-16:00)
+fe -> rez_r : POST /reservations\n{vehicle_id, charger_id,\ndate, start_time, end_time}
+
+rez_r -> comp_s : check_compatibility\n(vehicle_id, charger_id)
+comp_s -> db : SELECT connector_type FROM vehicles\nSELECT connector_type FROM chargers
+db --> comp_s : vehicle.CCS, charger.CCS
+comp_s --> rez_r : is_compatible = True
+
+rez_r -> rez_s : create_reservation()
+
+note right of rez_s
+  3 Is Kurali Kontrolu:
+  1. Maks 2 saat suresi
+  2. Maks 24 saat onceden
+  3. Cakisma engeli (double-booking)
+end note
+
+rez_s -> db : SELECT FROM reservations\nWHERE charger_id = ? AND date = ?\nAND status = 'confirmed'\nAND time overlap
+db --> rez_s : no conflict
+rez_s -> db : INSERT INTO reservations\n(status='confirmed')
+db --> rez_s : reservation record
+rez_s --> rez_r : reservation created
+
+rez_r --> fe : 201 Created\n{reservation, "CCS Supported"}
+fe --> driver : "Rezervasyon onaylandi!"
+
+== 5. SHOW ROUTE (Direct Manipulation) ==
+fe -> map_r : GET /map/directions\n?origin=user_loc&destination=station_loc
+map_r -> gmaps : Directions API
+gmaps --> map_r : route polyline + ETA
+map_r --> fe : route data
+fe --> driver : Haritada rota cizilir\n(RouteDisplay component)
+
+@enduml

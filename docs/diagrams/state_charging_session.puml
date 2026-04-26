@@ -1,0 +1,32 @@
+@startuml state_charging_session
+!theme plain
+title ChargingSession State Machine\n(Sommerville Ch.5)
+
+[*] --> Active : Kullanici QR tarar ve sarj baslatir (REQ 1.21)\n/ startBatteryLevel kaydedilir\n/ gercek zamanli takip baslar
+
+Active --> Completed : Kullanici "Tamamla" butonuna basar\n/ endBatteryLevel kaydedilir\n/ energyConsumed hesaplanir\n/ totalCost = energyConsumed * pricingPerKWh\n/ cuzdandan otomatik odeme\n/ DigitalReceipt olusturulur
+Active --> Completed : 2 saat siniri doldu (REQ 1.9)\n/ otomatik tamamlama\n/ bildirim gonderilir
+
+state Active #FFD700 {
+  state "Monitoring" as mon
+  mon : Polling (her 5 saniye)
+  mon : current kWh, estimated time, cost so far
+  mon : Frontend: Analogue (progress bar) + Digital (kWh/TL)
+}
+
+state Completed #90EE90
+
+note right of Completed
+  Tamamlandiginda:
+  1. energyConsumed hesaplanir (kWh)
+  2. totalCost = energyConsumed * pricingPerKWh
+  3. Wallet'tan otomatik dusulur (Transaction olusur)
+  4. Bakiye <50 TL ise bildirim (REQ 1.15)
+  5. DigitalReceipt olusturulur
+  6. Charger status -> available
+  7. Reservation status -> completed
+  8. Notification gonderilir
+  9. Kullanici makbuzu goruntuleyebilir (REQ 1.20)
+end note
+
+@enduml

@@ -1,0 +1,159 @@
+@startuml domain_model
+!theme plain
+title EV Charging Station Network Management System - Domain Model\n(FSE_REPORT_Group_14 ile Birebir)
+
+' === ACTORS ===
+class EVDriver {
+  driverID
+  name
+  email
+  phoneNumber
+}
+
+class StationOperator {
+  operatorID
+  name
+  email
+  assignedRegion
+}
+
+class SystemAdministrator {
+  adminID
+  name
+  email
+}
+
+' === CORE ENTITIES ===
+class Vehicle {
+  vehicleID
+  brand
+  model
+  batteryCapacity
+  connectorType
+  plateNumber
+}
+
+class FavoriteStation {
+  addedAt
+}
+
+class ChargingStation {
+  stationID
+  name
+  location
+  address
+  operatingHours
+  status
+}
+
+class Charger {
+  chargerID
+  chargerType
+  powerOutput
+  connectorType
+  pricingPerKWh
+  status
+}
+
+class Reservation {
+  reservationID
+  date
+  startTime
+  endTime
+  status
+}
+
+class ChargingSession {
+  sessionID
+  startBatteryLevel
+  endBatteryLevel
+  energyConsumed
+  totalCost
+  status
+}
+
+class DigitalReceipt {
+  receiptID
+  issuedAt
+  totalAmount
+  energyConsumed
+  unitPrice
+}
+
+class Transaction {
+  transactionID
+  amount
+  type
+  timestamp
+  status
+}
+
+class Wallet {
+  walletID
+  balance
+}
+
+class Notification {
+  notificationID
+  message
+  type
+  sentAt
+  isRead
+}
+
+class IssueReport {
+  reportID
+  description
+  category
+  status
+  reportedAt
+}
+
+class MaintenanceNote {
+  noteID
+  content
+  createdAt
+}
+
+class Report {
+  reportID
+  type
+  dateRange
+  content
+}
+
+' === ASSOCIATIONS ===
+EVDriver "1" -- "0..*" Vehicle : owns >
+EVDriver "1" -- "0..*" FavoriteStation : saves >
+EVDriver "1" -- "0..*" Reservation : makes >
+EVDriver "1" -- "0..*" Notification : receives >
+EVDriver "1" -- "1" Wallet : has >
+
+FavoriteStation "0..*" -- "1" ChargingStation : references >
+
+Vehicle "1" -- "0..*" Reservation : used in >
+
+ChargingStation "1" *-- "1..*" Charger : contains >
+StationOperator "1" -- "0..*" ChargingStation : manages >
+
+Charger "1" -- "0..*" Reservation : reserved for >
+Charger "1" -- "0..*" ChargingSession : hosts >
+
+Reservation "1" -- "0..1" ChargingSession : initiates >
+
+ChargingSession "1" -- "1" DigitalReceipt : produces >
+ChargingSession "1" -- "1" Transaction : generates >
+
+Wallet "1" -- "0..*" Transaction : records >
+
+IssueReport "0..*" -- "1" Charger : reported for >
+IssueReport "1" -- "0..*" MaintenanceNote : has >
+
+StationOperator "1" -- "0..*" IssueReport : handles >
+StationOperator -- MaintenanceNote : writes >
+
+SystemAdministrator "1" -- "0..*" StationOperator : assigns to >
+SystemAdministrator -- ChargingStation : configures >
+SystemAdministrator "1" -- "0..*" Report : generates >
+
+@enduml

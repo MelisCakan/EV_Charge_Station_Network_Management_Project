@@ -1,0 +1,138 @@
+@startuml system_architecture
+!theme plain
+title System Architecture\nClient-Server (Ch.6, Slide 28) + Layered Architecture (Ch.6, Slide 22)
+
+skinparam rectangle {
+  roundCorner 10
+}
+skinparam nodesep 60
+skinparam ranksep 60
+
+' ========== CLIENT ==========
+rectangle "CLIENT (Browser)" as client #E3F2FD {
+  rectangle "Pages (App Router)" as pages {
+    component "Login / Register" as auth_page
+    component "Vehicle Registration" as vehicle_page
+    component "Station Detail" as station_page
+    component "Reservation Form" as rez_page
+    component "Charging Dashboard" as charge_page
+    component "Wallet" as wallet_page
+  }
+  rectangle "Map Components" as map_comps {
+    component "MapView" as mapview
+    component "StationMarker" as marker
+    component "RouteDisplay" as route
+    component "FilterPanel" as filter
+  }
+}
+
+' ========== GOOGLE MAPS JS (sag ustte) ==========
+cloud "Google Maps\nJS API" as gmaps_js #E0F7FA
+
+' ========== SERVER ==========
+rectangle "SERVER (FastAPI Backend)" as server #FFF8E1 {
+  rectangle "LAYER 2: Routers + Auth" as L2 #E8F5E9 {
+    component "auth_router" as auth_r
+    component "vehicle_router" as veh_r
+    component "station_router" as sta_r
+    component "reservation_router" as rez_r
+    component "session_router" as ses_r
+    component "wallet_router" as wal_r
+    component "admin_router" as adm_r
+    component "Core (JWT + bcrypt)" as sec
+  }
+
+  rectangle "LAYER 3: Business Logic" as L3 #FFF3E0 {
+    component "compatibility_service" as comp_s
+    component "reservation_service" as rez_s
+    component "session_service" as ses_s
+    component "wallet_service" as wal_s
+    component "notification_service" as not_s
+    component "maintenance_service" as mnt_s
+  }
+
+  rectangle "LAYER 4: Data Access" as L4 #FCE4EC {
+    component "SQLModel ORM" as orm
+    component "Alembic Migrations" as alembic
+  }
+}
+
+' ========== DATABASE (altta ortada) ==========
+database "PostgreSQL" as db
+
+' ========== EXTERNAL (altta solda) ==========
+cloud "Server-Side External" as ext_server #ECEFF1 {
+  component "Google Maps\nDirections API" as gmaps_dir
+  component "OCPP Hardware\n(Simulated)" as ocpp
+}
+
+' ========== LAYOUT HINTS ==========
+client -[hidden]right-> gmaps_js
+ext_server -[hidden]right-> db
+
+' ========== CONNECTIONS ==========
+
+' Client -> Google Maps JS (noktali - map_comps'tan cikan)
+mapview ..right..> gmaps_js
+
+' Client-Server boundary (ana ok)
+pages -down-> L2 : HTTP / REST API\n(JSON + JWT)
+
+' Layered Architecture (server icinde, labelsiz temiz oklar)
+L2 -down-> L3
+L3 -down-> L4
+
+' DB
+L4 -down-> db : SQL
+
+' Server -> External (sola)
+L3 -left-> ext_server
+
+' ========== NOTES (detayli aciklamalar) ==========
+
+note top of gmaps_js
+  <b>Client-Side Google Maps</b>
+  Browser'dan dogrudan cagirilir:
+  - Markers (istasyon gosterimi)
+  - Geocoding (konum -> adres)
+  - Distance Matrix (mesafe hesabi)
+  - Renk kodlari: Yesil/Sari/Kirmizi
+end note
+
+note left of client
+  <b>Client-Server Pattern</b>
+  <b>(Ch.6, Slide 28-29)</b>
+  --
+  Client: Browser'da calisir
+  Server: Backend sunucuda calisir
+  Iletisim: HTTP/REST (JSON)
+  Auth: JWT Bearer Token
+end note
+
+note left of server
+  <b>Layered Architecture</b>
+  <b>(Ch.6, Slide 22-23)</b>
+  --
+  L2: HTTP routing, JWT auth,
+      rol bazli yetkilendirme
+  L3: Is kurallari, uyumluluk,
+      maliyet hesaplama, iade
+  L4: SQLModel ORM, Alembic
+      migration, veri erisimi
+end note
+
+note bottom of db
+  <b>PostgreSQL</b>
+  13 tablo (16 domain sinifi)
+  ACID uyumlu islemler
+  Connection pooling
+end note
+
+note bottom of ext_server
+  <b>Server-Side External</b>
+  Directions API: Rota hesaplama
+  OCPP: Sarj istasyonu iletisimi
+  (prototipte simule edilecek)
+end note
+
+@enduml

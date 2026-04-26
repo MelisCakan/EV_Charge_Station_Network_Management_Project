@@ -1,0 +1,26 @@
+@startuml state_charger
+!theme plain
+title Charger State Machine\n(Sommerville Ch.5 - Event-driven Model)
+
+[*] --> Available : Charger sisteme eklenir
+
+Available --> Occupied : Rezervasyon olusturuldu\nve sarj basladi
+Available --> Offline : Operator bakim icin\noffline yapar\n/ tum rez. iptal + iade (UC3)
+
+Occupied --> Available : Sarj oturumu\ntamamlandi\n/ charger serbest
+Occupied --> Offline : Operator acil\noffline yapar\n/ aktif oturum sonlandirilir + iade
+
+Offline --> Available : Bakim tamamlandi\nOperator aktif eder\n/ charger tekrar rez.'a acik
+
+state Available #90EE90
+state Occupied #FFD700
+state Offline #FF6B6B
+
+note right of Available
+  Renk Kodu (Ch.7):
+  Yesil = Available
+  Sari = Occupied
+  Kirmizi = Offline
+end note
+
+@enduml

@@ -1,0 +1,110 @@
+@startuml api_endpoints
+!theme plain
+title API Endpoints - FastAPI REST API\n(Layer 2: Routers)
+
+left to right direction
+
+package "Auth (auth_router.py)" as auth #E8F5E9 {
+  usecase "POST /auth/register" as r1
+  usecase "POST /auth/login" as r2
+  usecase "GET  /auth/me" as r3
+  usecase "POST /auth/password-reset-request" as r4
+  usecase "POST /auth/password-reset" as r5
+}
+
+package "Vehicles (vehicle_router.py)" as veh #E3F2FD {
+  usecase "GET    /vehicles" as v1
+  usecase "POST   /vehicles" as v2
+  usecase "GET    /vehicles/{id}" as v3
+  usecase "PUT    /vehicles/{id}" as v4
+  usecase "DELETE /vehicles/{id}" as v5
+}
+
+package "Stations (station_router.py)" as sta #FFF3E0 {
+  usecase "GET /stations" as s1
+  usecase "GET /stations/{id}" as s2
+  usecase "GET /stations/{id}/chargers" as s3
+}
+
+package "Reservations (reservation_router.py)" as rez #FCE4EC {
+  usecase "POST   /reservations" as rz1
+  usecase "GET    /reservations/my" as rz2
+  usecase "GET    /reservations/{id}" as rz3
+  usecase "DELETE /reservations/{id}" as rz4
+}
+
+package "Charging Sessions (session_router.py)" as ses #F3E5F5 {
+  usecase "POST /sessions/start" as ss1
+  usecase "GET  /sessions/{id}/progress" as ss2
+  usecase "POST /sessions/{id}/complete" as ss3
+}
+
+package "Wallet (wallet_router.py)" as wal #E0F7FA {
+  usecase "GET  /wallet/balance" as w1
+  usecase "POST /wallet/topup" as w2
+  usecase "GET  /wallet/transactions" as w3
+}
+
+package "Receipts (receipt_router.py)" as rcp #F1F8E9 {
+  usecase "GET /receipts/my" as rc1
+  usecase "GET /receipts/{id}" as rc2
+}
+
+package "Map (map_router.py)" as map #FFF9C4 {
+  usecase "GET /map/stations" as m1
+  usecase "GET /map/directions" as m2
+}
+
+package "Admin (admin_router.py)" as adm #EFEBE9 {
+  usecase "GET /admin/revenue" as a1
+  usecase "GET /admin/utilization" as a2
+  usecase "GET /admin/peak-hours" as a3
+  usecase "PUT /chargers/{id}/status" as a4
+}
+
+package "Issues (issue_router.py)" as iss #FFCDD2 {
+  usecase "POST /issues" as i1
+  usecase "GET  /issues" as i2
+  usecase "PUT  /issues/{id}" as i3
+  usecase "POST /issues/{id}/notes" as i4
+}
+
+package "Favorites (favorite_router.py)" as fav #C8E6C9 {
+  usecase "GET    /favorites" as f1
+  usecase "POST   /favorites" as f2
+  usecase "DELETE /favorites/{station_id}" as f3
+}
+
+note bottom of auth
+  REQ 1.16: register + login
+  REQ 1.17: password reset
+  Public (no JWT)
+end note
+
+note bottom of rez
+  REQ 1.18: DELETE iptal
+  >=30dk: %100 iade
+  <30dk: %20 ceza
+end note
+
+note bottom of ses
+  REQ 1.21: QR dogrulama
+  REQ 1.9: 2h auto-complete
+end note
+
+note bottom of rcp
+  REQ 1.20: Makbuz
+  goruntuleme/indirme
+end note
+
+note bottom of adm
+  Admin/Operator only
+  (role check required)
+end note
+
+note bottom of fav
+  Not Implemented Yet
+  (prototip disinda)
+end note
+
+@enduml

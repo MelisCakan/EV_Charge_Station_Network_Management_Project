@@ -1,0 +1,79 @@
+@startuml sequence_uc3_maintenance
+!theme plain
+title UC3: Station Maintenance and Automatic Reservation Cancellation
+
+actor "Station\nOperator" as operator
+participant "Frontend\n(Admin Panel)" as fe
+participant "admin_router\n(Layer 2)" as adm_r
+participant "issue_router\n(Layer 2)" as iss_r
+participant "maintenance_service\n(Layer 3)" as mnt_s
+participant "reservation_service\n(Layer 3)" as rez_s
+participant "wallet_service\n(Layer 3)" as wal_s
+participant "notification_service\n(Layer 3)" as not_s
+participant "Database\n(Layer 4)" as db
+
+== 1. ISSUE REPORT (Optional - by EV Driver or Operator) ==
+operator -> fe : Ariza raporlar veya dogrudan offline yapar
+fe -> iss_r : POST /issues\n{charger_id, description:"Connector damaged",\ncategory:"hardware"}
+iss_r -> db : INSERT INTO issue_reports\n(charger_id, description, category,\nstatus='open', reported_at=now())
+db --> iss_r : issue_report record
+iss_r --> fe : 201 Created {issue}
+
+== 2. MARK CHARGER OFFLINE ==
+operator -> fe : Charger'i offline yapar
+fe -> adm_r : PUT /chargers/{id}/status\n{status: "offline"}
+adm_r -> mnt_s : mark_charger_offline(charger_id)
+
+mnt_s -> db : UPDATE chargers SET status = 'offline'\nWHERE id = charger_id
+db --> mnt_s : updated
+
+== 3. AUTOMATIC BULK CANCELLATION ==
+mnt_s -> rez_s : cancel_all_reservations(charger_id)
+rez_s -> db : SELECT * FROM reservations\nWHERE charger_id = ?\nAND status = 'confirmed'\nAND date >= today
+db --> rez_s : [reservation_1, reservation_2, ...]
+
+loop Her etkilenen rezervasyon icin
+  rez_s -> db : UPDATE reservations\nSET status = 'cancelled'\nWHERE id = reservation_id
+end
+
+rez_s --> mnt_s : cancelled_reservations list\n(user_ids, amounts)
+
+== 4. AUTOMATIC BULK REFUND (REQ 2.4: %100 iade) ==
+mnt_s -> wal_s : refund_all(cancelled_reservations)
+
+loop Her iptal edilen rezervasyon icin
+  wal_s -> db : UPDATE wallets SET balance = balance + refund_amount\nWHERE user_id = ?
+  wal_s -> db : INSERT INTO transactions\n(wallet_id, amount=+refund, type='refund',\nstatus='completed')
+end
+
+wal_s --> mnt_s : refunds completed
+
+== 5. NOTIFY AFFECTED USERS ==
+mnt_s -> not_s : notify_users(affected_users)
+
+loop Her etkilenen kullanici icin
+  not_s -> db : INSERT INTO notifications\n(user_id, message="DC 50kW #03 bakim nedeniyle\noffline. Rezervasyonunuz iptal edildi.\nOdemeniz iade edildi: XX TL",\ntype="maintenance_cancellation")
+end
+
+not_s --> mnt_s : notifications sent
+
+mnt_s --> adm_r : {charger: offline,\ncancelled: 2 reservations,\nrefunded: 2 users}
+adm_r --> fe : 200 OK
+fe --> operator : "Charger offline.\n2 rezervasyon iptal, 2 iade yapildi."
+
+== 6. MAINTENANCE NOTE ==
+operator -> fe : Bakim notu ekler
+fe -> iss_r : POST /issues/{id}/notes\n{content: "Konnektor degistirildi"}
+iss_r -> db : INSERT INTO maintenance_notes\n(issue_report_id, user_id, content, created_at)
+db --> iss_r : note record
+iss_r --> fe : 201 Created
+
+== 7. BRING CHARGER BACK ONLINE ==
+operator -> fe : Bakim tamamlandi, online yap
+fe -> adm_r : PUT /chargers/{id}/status\n{status: "available"}
+adm_r -> db : UPDATE chargers SET status = 'available'
+adm_r -> db : UPDATE issue_reports SET status = 'resolved'\nWHERE charger_id = ? AND status = 'open'
+adm_r --> fe : 200 OK {charger: available}
+fe --> operator : "Charger tekrar aktif."
+
+@enduml

@@ -1,0 +1,88 @@
+@startuml component_frontend
+!theme plain
+title Frontend Component Diagram\n(Next.js 14 - Layer 1)
+
+package "Next.js App Router (src/app/)" {
+  component "layout.tsx" as layout <<Root Layout>> #E3F2FD
+  note right of layout
+    Navbar (Menu Selection)
+    Footer
+    AuthProvider
+  end note
+
+  package "Auth Pages" #FFF3E0 {
+    component "(auth)/login/page.tsx" as login <<Form Fill-in>>
+    component "(auth)/register/page.tsx" as register <<Form Fill-in>>
+    component "(auth)/reset-password/page.tsx" as resetpw <<Form Fill-in>>
+  }
+
+  package "Driver Pages" #E8F5E9 {
+    component "page.tsx\n(Ana Sayfa - Harita)" as home <<Direct Manipulation>>
+    component "vehicles/page.tsx" as veh_list
+    component "vehicles/new/page.tsx" as veh_new <<Form Fill-in>>
+    component "stations/[id]/page.tsx" as sta_detail <<Menu Selection>>
+    component "reservations/page.tsx" as rez_list
+    component "reservations/new/page.tsx" as rez_new <<Form Fill-in + Menu Selection>>
+    component "charging/[sessionId]/page.tsx" as charging <<Dynamic Info Display>>
+    component "wallet/page.tsx" as wallet <<Form Fill-in>>
+    component "receipts/page.tsx" as receipts <<Data Display>>
+    component "favorites/page.tsx" as favs <<Not Implemented Yet>>
+    component "history/page.tsx" as history <<Not Implemented Yet>>
+  }
+
+  package "Admin Pages" #FCE4EC {
+    component "admin/dashboard/page.tsx" as admin <<Data Visualisation>>
+  }
+}
+
+package "Map Components (src/components/map/)" #E0F7FA {
+  component "MapView.tsx" as mapview <<Direct Manipulation>>
+  component "StationMarker.tsx" as marker <<Colour Coding>>
+  component "RouteDisplay.tsx" as route_disp
+  component "FilterPanel.tsx" as filter <<Menu Selection + Form Fill-in>>
+}
+
+package "Charging Components (src/components/charging/)" #FFF9C4 {
+  component "SessionProgress.tsx" as progress <<Analogue + Digital Display>>
+}
+
+package "UI Components (src/components/ui/)" #F3E5F5 {
+  component "shadcn/ui\n(Button, Input, Dialog,\nCard, Table, Toast)" as shadcn
+}
+
+package "Lib (src/lib/)" #ECEFF1 {
+  component "api.ts\n(Axios + JWT interceptor)" as api
+  component "auth.ts\n(Token management)" as auth_lib
+  component "types.ts\n(TypeScript interfaces)" as types
+}
+
+package "Hooks (src/hooks/)" #EFEBE9 {
+  component "useStations.ts" as hook_sta
+  component "useReservation.ts" as hook_rez
+  component "useChargingSession.ts" as hook_ses
+  component "useWallet.ts" as hook_wal
+}
+
+' === Connections ===
+home --> mapview : renders
+home --> filter : renders
+sta_detail --> marker : uses
+rez_new --> mapview : station selection
+charging --> progress : renders
+
+login --> api : POST /auth/login
+register --> api : POST /auth/register
+resetpw --> api : POST /auth/password-reset
+receipts --> api : GET /receipts/my
+veh_new --> api : POST /vehicles
+rez_new --> api : POST /reservations
+charging --> api : GET/POST /sessions
+
+hook_sta --> api
+hook_rez --> api
+hook_ses --> api
+hook_wal --> api
+
+api --> auth_lib : JWT token
+
+@enduml
