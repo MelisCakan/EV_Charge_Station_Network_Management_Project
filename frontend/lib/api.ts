@@ -1,0 +1,118 @@
+'use client';
+
+import axios, { AxiosError, AxiosInstance } from 'axios';
+
+export interface ApiError {
+  message: string;
+  status?: number;
+  data?: unknown;
+}
+
+export interface AuthPayload {
+  email: string;
+  password: string;
+}
+
+export interface SignupPayload extends AuthPayload {
+  name: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  };
+}
+
+const getStoredToken = () => {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem('token');
+};
+
+const api: AxiosInstance = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL ?? '/api',
+  headers: {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  },
+});
+
+api.interceptors.request.use(
+  (config) => {
+    const token = getStoredToken();
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(normalizeAxiosError(error))
+);
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('token');
+      }
+    }
+    return Promise.reject(normalizeAxiosError(error));
+  }
+);
+
+const normalizeAxiosError = (error: unknown): ApiError => {
+  if (axios.isAxiosError(error)) {
+    return {
+      message:
+        error.response?.data?.message || error.message || 'API request failed',
+      status: error.response?.status,
+      data: error.response?.data,
+    };
+  }
+
+  return {
+    message: typeof error === 'string' ? error : 'Unexpected API error',
+  };
+};
+
+export const setAuthToken = (token: string) => {
+  if (typeof window !== 'undefined') {
+    window.localStorage.setItem('token', token);
+  }
+};
+
+export const clearAuthToken = () => {
+  if (typeof window !== 'undefined') {
+    window.localStorage.removeItem('token');
+  }
+};
+
+export const getAuthToken = () => getStoredToken();
+
+export const apiClient = api;
+
+export const authApi = {
+  login: async (payload: AuthPayload) => {
+    const response = await api.post<AuthResponse>('/auth/login', payload);
+    return response.data;
+  },
+  signup: async (payload: SignupPayload) => {
+    const response = await api.post<AuthResponse>('/auth/signup', payload);
+    return response.data;
+  },
+};
+
+export const stationApi = {
+  list: async () => {
+    const response = await api.get('/stations');
+    return response.data;
+  },
+  details: async (stationId: string) => {
+    const response = await api.get(`/stations/${stationId}`);
+    return response.data;
+  },
+};
+
+export const handleApiError = (error: unknown): ApiError => normalizeAxiosError(error);
