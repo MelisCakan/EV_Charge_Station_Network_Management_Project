@@ -1,6 +1,7 @@
-"""Seed script: ornek verilerle veritabanini doldurur."""
+"""Seed script: ornek verilerle veritabanini doldurur (Repository Pattern ile)."""
 
-from sqlmodel import Session, select
+import bcrypt
+from sqlmodel import Session
 
 from app.database import engine, create_db_and_tables
 from app.models.user import User
@@ -8,7 +9,10 @@ from app.models.vehicle import Vehicle
 from app.models.station import ChargingStation
 from app.models.charger import Charger
 from app.models.wallet import Wallet
-import bcrypt
+from app.repositories import (
+    UserRepository, VehicleRepository, StationRepository,
+    ChargerRepository, WalletRepository,
+)
 
 
 def hash_password(password: str) -> str:
@@ -19,46 +23,46 @@ def seed():
     create_db_and_tables()
 
     with Session(engine) as session:
+        user_repo = UserRepository(session)
+        vehicle_repo = VehicleRepository(session)
+        station_repo = StationRepository(session)
+        charger_repo = ChargerRepository(session)
+        wallet_repo = WalletRepository(session)
+
         # Check if already seeded
-        if session.exec(select(User)).first():
+        if user_repo.count() > 0:
             print("Database already seeded, skipping.")
             return
 
         # --- Users ---
-        driver = User(
+        driver = user_repo.create(User(
             email="driver@test.com",
             password_hash=hash_password("Driver123"),
             full_name="Ahmet Yilmaz",
             phone_number="05551234567",
             role="driver",
-        )
-        operator = User(
+        ))
+        operator = user_repo.create(User(
             email="operator@test.com",
             password_hash=hash_password("Operator123"),
             full_name="Elif Demir",
             phone_number="05559876543",
             role="operator",
             assigned_region="Izmir",
-        )
-        admin = User(
+        ))
+        admin = user_repo.create(User(
             email="admin@test.com",
             password_hash=hash_password("Admin123"),
             full_name="System Admin",
             role="admin",
-        )
-        session.add_all([driver, operator, admin])
-        session.commit()
-        session.refresh(driver)
-        session.refresh(operator)
-        session.refresh(admin)
+        ))
 
         # --- Wallets (500 TL each) ---
         for user in [driver, operator, admin]:
-            session.add(Wallet(user_id=user.id, balance=500.0))
-        session.commit()
+            wallet_repo.create(Wallet(user_id=user.id, balance=500.0))
 
         # --- Vehicles ---
-        session.add_all([
+        vehicle_repo.create_many([
             Vehicle(
                 user_id=driver.id,
                 brand="Tesla",
@@ -76,7 +80,6 @@ def seed():
                 plate_number="35 DEF 456",
             ),
         ])
-        session.commit()
 
         # --- Stations ---
         stations_data = [
@@ -86,16 +89,14 @@ def seed():
         ]
         stations = []
         for name, lat, lng, addr, city in stations_data:
-            st = ChargingStation(name=name, latitude=lat, longitude=lng, address=addr, city=city)
-            session.add(st)
+            st = station_repo.create(ChargingStation(
+                name=name, latitude=lat, longitude=lng, address=addr, city=city,
+            ))
             stations.append(st)
-        session.commit()
-        for st in stations:
-            session.refresh(st)
 
         # --- Chargers (2 per station: 1 AC + 1 DC) ---
         for i, station in enumerate(stations):
-            session.add(Charger(
+            charger_repo.create(Charger(
                 station_id=station.id,
                 charger_code=f"AC 22kW #{i*2+1:02d}",
                 charger_type="AC",
@@ -103,7 +104,7 @@ def seed():
                 connector_type="Type2",
                 pricing_per_kwh=4.50,
             ))
-            session.add(Charger(
+            charger_repo.create(Charger(
                 station_id=station.id,
                 charger_code=f"DC 50kW #{i*2+2:02d}",
                 charger_type="DC",
@@ -111,7 +112,6 @@ def seed():
                 connector_type="CCS",
                 pricing_per_kwh=7.80,
             ))
-        session.commit()
 
         print("Seed completed:")
         print("  - 3 users (driver, operator, admin)")
