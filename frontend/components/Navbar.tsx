@@ -58,7 +58,7 @@ export function Navbar() {
             {isAuthenticated ? (
               <>
                 <span className="text-[#D9D5D2] text-sm hidden sm:inline">
-                  {user?.name}
+                  {user?.full_name}
                 </span>
                 <Button
                   onClick={handleLogout}
