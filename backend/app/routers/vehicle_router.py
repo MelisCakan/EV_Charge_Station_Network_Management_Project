@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.vehicle import Vehicle
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.vehicle_schema import VehicleCreate, VehicleUpdate, VehicleRead
+from app.services.compatibility_service import check_compatibility
 
 router = APIRouter(prefix="/vehicles", tags=["Vehicles"])
 
@@ -142,3 +143,28 @@ def delete_vehicle(
         )
 
     repo.delete(vehicle)
+
+
+@router.get("/{vehicle_id}/compatibility/{charger_id}")
+def check_vehicle_charger_compatibility(
+    vehicle_id: int,
+    charger_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = VehicleRepository(session)
+    vehicle = repo.get_by_id(vehicle_id)
+
+    if not vehicle:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vehicle not found",
+        )
+
+    if vehicle.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not your vehicle",
+        )
+
+    return check_compatibility(vehicle_id, charger_id, session)
