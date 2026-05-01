@@ -14,16 +14,18 @@ export interface AuthPayload {
 }
 
 export interface SignupPayload extends AuthPayload {
-  name: string;
+  full_name: string;
+  phone_number?: string;
 }
 
-export interface AuthResponse {
-  token: string;
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
+export interface LoginResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface RegisterResponse {
+  message: string;
+  user_id: number;
 }
 
 const getStoredToken = () => {
@@ -95,11 +97,15 @@ export const apiClient = api;
 
 export const authApi = {
   login: async (payload: AuthPayload) => {
-    const response = await api.post<AuthResponse>('/auth/login', payload);
+    const response = await api.post<LoginResponse>('/auth/login', payload);
     return response.data;
   },
-  signup: async (payload: SignupPayload) => {
-    const response = await api.post<AuthResponse>('/auth/signup', payload);
+  register: async (payload: SignupPayload) => {
+    const response = await api.post<RegisterResponse>('/auth/register', payload);
+    return response.data;
+  },
+  me: async () => {
+    const response = await api.get('/auth/me');
     return response.data;
   },
 };

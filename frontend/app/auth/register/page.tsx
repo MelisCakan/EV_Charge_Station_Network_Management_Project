@@ -5,9 +5,10 @@ import { useState } from 'react';
 import { authApi, handleApiError, setAuthToken } from '@/lib/api';
 
 export default function RegisterPage() {
-  const [name, setName] = useState('');
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -17,8 +18,9 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      const data = await authApi.signup({ name, email, password });
-      setAuthToken(data.token);
+      await authApi.register({ email, password, full_name: fullName, phone_number: phone || undefined });
+      const loginData = await authApi.login({ email, password });
+      setAuthToken(loginData.access_token);
       window.location.href = '/';
     } catch (err) {
       const apiError = handleApiError(err);
@@ -41,17 +43,31 @@ export default function RegisterPage() {
 
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div>
-            <label className="text-sm font-medium text-[#012623]" htmlFor="name">
+            <label className="text-sm font-medium text-[#012623]" htmlFor="fullName">
               Full name
             </label>
             <input
-              id="name"
+              id="fullName"
               type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
               required
               className="mt-3 block w-full rounded-2xl border border-[#4C736F] bg-[#F2F2F0] px-4 py-3 text-[#000D0C] placeholder:text-[#718681] outline-none transition focus:border-[#4C736F] focus:ring-2 focus:ring-[#4C736F]/30"
               placeholder="Your full name"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-[#012623]" htmlFor="phone">
+              Phone number
+            </label>
+            <input
+              id="phone"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="mt-3 block w-full rounded-2xl border border-[#4C736F] bg-[#F2F2F0] px-4 py-3 text-[#000D0C] placeholder:text-[#718681] outline-none transition focus:border-[#4C736F] focus:ring-2 focus:ring-[#4C736F]/30"
+              placeholder="05XX XXX XX XX (optional)"
             />
           </div>
 
