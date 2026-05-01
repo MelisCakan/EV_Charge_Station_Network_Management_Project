@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import Index
 from sqlmodel import SQLModel, Field
@@ -18,4 +18,4 @@ class ChargingStation(SQLModel, table=True):
     city: Optional[str] = Field(default=None, index=True)
     operating_hours: str = Field(default="09:00-18:00")  # REQ 2.13
     status: str = Field(default="active", index=True)  # active | inactive
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

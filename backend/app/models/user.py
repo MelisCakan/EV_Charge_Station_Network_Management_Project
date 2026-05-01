@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy import Index
 from sqlmodel import SQLModel, Field
@@ -16,4 +16,4 @@ class User(SQLModel, table=True):
     phone_number: Optional[str] = None
     role: str = Field(default="driver")  # driver | operator | admin
     assigned_region: Optional[str] = None  # only for operators
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
