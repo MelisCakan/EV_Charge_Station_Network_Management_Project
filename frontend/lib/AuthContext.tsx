@@ -1,19 +1,22 @@
 'use client';
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authApi, setAuthToken, clearAuthToken, getAuthToken } from '@/lib/api';
 
 interface User {
-  id: string;
+  id: number;
   email: string;
-  name: string;
+  full_name: string;
+  phone_number: string | null;
+  role: string;
 }
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  signup: (email: string, password: string, name: string) => Promise<void>;
+  logout: () => void;
+  signup: (email: string, password: string, full_name: string, phone_number?: string) => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -21,52 +24,50 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const token = getAuthToken();
+    if (token) {
+      authApi.me()
+        .then((data) => setUser(data))
+        .catch(() => {
+          clearAuthToken();
+          setUser(null);
+        })
+        .finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false);
+    }
+  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      console.log('Login attempt:', email);
-      // Simulated login
-      setTimeout(() => {
-        setUser({ id: '1', email, name: 'User' });
-        setIsLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Login failed:', error);
+      const data = await authApi.login({ email, password });
+      setAuthToken(data.access_token);
+      const me = await authApi.me();
+      setUser(me);
+    } finally {
       setIsLoading(false);
-      throw error;
     }
   };
 
-  const logout = async () => {
-    setIsLoading(true);
-    try {
-      // TODO: Replace with actual API call
-      setUser(null);
-      setIsLoading(false);
-    } catch (error) {
-      console.error('Logout failed:', error);
-      setIsLoading(false);
-      throw error;
-    }
+  const logout = () => {
+    clearAuthToken();
+    setUser(null);
   };
 
-  const signup = async (email: string, password: string, name: string) => {
+  const signup = async (email: string, password: string, full_name: string, phone_number?: string) => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      console.log('Signup attempt:', email, name);
-      // Simulated signup
-      setTimeout(() => {
-        setUser({ id: '1', email, name });
-        setIsLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error('Signup failed:', error);
+      await authApi.register({ email, password, full_name, phone_number });
+      const data = await authApi.login({ email, password });
+      setAuthToken(data.access_token);
+      const me = await authApi.me();
+      setUser(me);
+    } finally {
       setIsLoading(false);
-      throw error;
     }
   };
 

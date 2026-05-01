@@ -17,7 +17,7 @@ export default function LoginPage() {
 
     try {
       const data = await authApi.login({ email, password });
-      setAuthToken(data.token);
+      setAuthToken(data.access_token);
       window.location.href = '/';
     } catch (err) {
       const apiError = handleApiError(err);
