@@ -445,3 +445,4 @@ Buradan tum endpoint'leri gorebilir ve direkt test edebilirsin.
 - 90 gereksinim, 9 viewpoint (Sommerville Ch.4)
 - 3 Use Case: Reservation (UC1), Charging (UC2), Maintenance (UC3)
 - 16 domain sinifi, 13 DB tablosu (EER generalization)
+# EV_Charge_Station_Network_Management_Project

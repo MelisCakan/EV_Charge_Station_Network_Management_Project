@@ -1,31 +1,27 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import create_db_and_tables
+from app.routers.auth_router import router as auth_router
 
 app = FastAPI(
-    title="EV Charging Station Network Management API",
-    description="Group 14 - FSE Project",
-    version="1.0.0",
+    title="EV Charging Station API",
+    version="1.0.0"
 )
+
+# -------------------
+# CORS CONFIG
+# -------------------
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://frontend:3000"],
+    allow_origins=["*"], # production'da frontend URL yazılır
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Router'lar Faz 2-3'te eklenecek:
-# app.include_router(auth_router, prefix="/auth", tags=["Auth"])
+# -------------------
+# ROUTERS
+# -------------------
 
-
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
-
-
-@app.get("/")
-def root():
-    return {"message": "EV Charging Station API", "docs": "/docs"}
+app.include_router(auth_router)
