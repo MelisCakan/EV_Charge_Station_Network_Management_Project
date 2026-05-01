@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/ev_charging")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:PASSWORD@localhost:5432/fse_project")
 SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-in-production")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
 
