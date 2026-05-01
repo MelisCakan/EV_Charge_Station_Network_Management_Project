@@ -1,6 +1,7 @@
 'use client';
 
 import axios, { AxiosError, AxiosInstance } from 'axios';
+import { ChargingStation } from './types';
 
 export interface ApiError {
   message: string;
@@ -110,13 +111,46 @@ export const authApi = {
   },
 };
 
+export type StationPayload = Omit<ChargingStation, 'id' | 'created_at'>;
+
+export const vehicleApi = {
+  list: async () => {
+    const response = await api.get('/vehicles');
+    return response.data;
+  },
+  create: async (payload: any) => {
+    const response = await api.post('/vehicles', payload);
+    return response.data;
+  },
+  update: async (vehicleId: number, payload: any) => {
+    const response = await api.put(`/vehicles/${vehicleId}`, payload);
+    return response.data;
+  },
+  delete: async (vehicleId: number) => {
+    const response = await api.delete(`/vehicles/${vehicleId}`);
+    return response.data;
+  },
+};
+
 export const stationApi = {
   list: async () => {
-    const response = await api.get('/stations');
+    const response = await api.get<ChargingStation[]>('/stations');
     return response.data;
   },
   details: async (stationId: string) => {
-    const response = await api.get(`/stations/${stationId}`);
+    const response = await api.get<ChargingStation>(`/stations/${stationId}`);
+    return response.data;
+  },
+  create: async (payload: StationPayload) => {
+    const response = await api.post<ChargingStation>('/stations', payload);
+    return response.data;
+  },
+  update: async (stationId: string, payload: Partial<StationPayload>) => {
+    const response = await api.put<ChargingStation>(`/stations/${stationId}`, payload);
+    return response.data;
+  },
+  delete: async (stationId: string) => {
+    const response = await api.delete(`/stations/${stationId}`);
     return response.data;
   },
 };

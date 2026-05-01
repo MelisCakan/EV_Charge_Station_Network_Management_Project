@@ -8,6 +8,10 @@ export interface MapStation {
   id: string;
   name: string;
   location: MapCoordinates;
+  connector_types?: Array<'CCS' | 'CHAdeMO' | 'Type2'>;
+  power_output?: number;
+  pricing_per_kwh?: number;
+  status?: 'available' | 'occupied' | 'offline';
 }
 
 // ─── Backend Model Types ───
