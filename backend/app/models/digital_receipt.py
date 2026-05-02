@@ -7,6 +7,7 @@ class DigitalReceipt(SQLModel, table=True):
     __tablename__ = "digital_receipts"
     id: Optional[int] = Field(default=None, primary_key=True)
     session_id: int = Field(foreign_key="charging_sessions.id", unique=True)
+    receipt_number: str = Field(unique=True, index=True)
     issued_at: datetime = Field(default_factory=datetime.utcnow)
     total_amount: float
     energy_consumed: float
