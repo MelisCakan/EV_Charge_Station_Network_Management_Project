@@ -3,6 +3,7 @@
 import { ChangeEvent } from 'react';
 
 type ConnectorType = 'CCS' | 'CHAdeMO' | 'Type2';
+export type StationStatus = 'available' | 'occupied' | 'offline';
 
 const connectorOptions: ConnectorType[] = ['CCS', 'CHAdeMO', 'Type2'];
 
@@ -12,26 +13,43 @@ const powerOptions = [
   { id: 'high', label: '150+ kW', value: [150, 1000] as [number, number] },
 ];
 
+const statusOptions: { value: StationStatus; label: string; dot: string }[] = [
+  { value: 'available', label: 'Available', dot: 'bg-green-500' },
+  { value: 'occupied',  label: 'Occupied',  dot: 'bg-yellow-500' },
+  { value: 'offline',   label: 'Offline',   dot: 'bg-red-500' },
+];
+
 interface FilterPanelProps {
   selectedConnectors: ConnectorType[];
   selectedPowerId: string;
   priceRange: [number, number];
+  selectedStatuses: StationStatus[];
   onConnectorChange: (connector: ConnectorType, checked: boolean) => void;
   onPowerChange: (powerId: string) => void;
   onPriceChange: (priceRange: [number, number]) => void;
+  onStatusChange: (status: StationStatus, checked: boolean) => void;
+  onReset: () => void;
 }
 
 export function FilterPanel({
   selectedConnectors,
   selectedPowerId,
   priceRange,
+  selectedStatuses,
   onConnectorChange,
   onPowerChange,
   onPriceChange,
+  onStatusChange,
+  onReset,
 }: FilterPanelProps) {
   const handleConnectorToggle = (event: ChangeEvent<HTMLInputElement>) => {
     const connector = event.target.value as ConnectorType;
     onConnectorChange(connector, event.target.checked);
+  };
+
+  const handleStatusToggle = (event: ChangeEvent<HTMLInputElement>) => {
+    const status = event.target.value as StationStatus;
+    onStatusChange(status, event.target.checked);
   };
 
   const handlePriceMinChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -47,12 +65,45 @@ export function FilterPanel({
   return (
     <aside className="rounded-[28px] border border-[#18423b]/80 bg-[#031712]/95 p-6 shadow-[0_20px_50px_rgba(0,0,0,0.25)] text-[#F2F2F0] max-h-[calc(100vh-180px)] overflow-auto lg:max-h-[calc(100vh-140px)]">
       <div className="space-y-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.28em] text-[#70B4A6]">Filters</p>
-          <h2 className="mt-2 text-xl font-semibold text-white">Station search</h2>
-          <p className="mt-2 text-sm text-[#D9D5D2]/80">
-            Narrow results by connector type, charger power, and price range.
-          </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.28em] text-[#70B4A6]">Filters</p>
+            <h2 className="mt-2 text-xl font-semibold text-white">Station search</h2>
+            <p className="mt-2 text-sm text-[#D9D5D2]/80">
+              Narrow results by connector type, charger power, and price range.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onReset}
+            className="mt-1 shrink-0 rounded-2xl border border-[#3E6359] bg-[#0D2B25] px-3 py-1.5 text-xs font-semibold text-[#C6E3DA] transition hover:border-[#6BC0A4] hover:bg-[#133A31]"
+          >
+            Reset
+          </button>
+        </div>
+
+        <div className="space-y-3 rounded-3xl border border-[#13423a]/80 bg-[#042117]/95 p-4">
+          <p className="text-sm font-semibold text-white">Station status</p>
+          <div className="space-y-2">
+            {statusOptions.map((option) => (
+              <label
+                key={option.value}
+                className="inline-flex w-full cursor-pointer items-center justify-between rounded-2xl border border-[#0E3A2F] bg-[#031B16] px-4 py-3 text-sm transition hover:border-[#6BC0A4]"
+              >
+                <span className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${option.dot}`} />
+                  {option.label}
+                </span>
+                <input
+                  type="checkbox"
+                  value={option.value}
+                  checked={selectedStatuses.includes(option.value)}
+                  onChange={handleStatusToggle}
+                  className="h-4 w-4 rounded border-gray-300 text-[#6BC0A4] focus:outline-none focus:ring-2 focus:ring-[#6BC0A4]"
+                />
+              </label>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-3 rounded-3xl border border-[#13423a]/80 bg-[#042117]/95 p-4">
