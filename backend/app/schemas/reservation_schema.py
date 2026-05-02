@@ -1,14 +1,17 @@
-from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
+from sqlmodel import SQLModel
 
-class ReservationCreate(BaseModel):
+
+class ReservationCreate(SQLModel):
     vehicle_id: int
     station_id: int
     charger_id: int
     start_time: datetime
     duration_minutes: int
 
-class ReservationResponse(BaseModel):
+
+class ReservationResponse(SQLModel):
     id: int
     user_id: int
     vehicle_id: int
@@ -17,4 +20,5 @@ class ReservationResponse(BaseModel):
     start_time: datetime
     end_time: datetime
     status: str
-    total_cost: float | None = None
+    total_cost: Optional[float] = None
+    created_at: datetime

@@ -3,14 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { APIProvider, Map } from "@vis.gl/react-google-maps";
 import { DEFAULT_CENTER, haversineDistance, fetchDrivingDistance } from "@/lib/maps";
-import { mockStations } from "@/lib/mockData";
-import { MapCoordinates, MapStation } from "@/lib/types";
+import { MapCoordinates, MapStation, ChargingStation, Charger } from "@/lib/types";
+import { stationApi, handleApiError } from "@/lib/api";
 import { StationMarker } from "./StationMarker";
 import { FilterPanel, StationStatus } from "./FilterPanel";
 import { StationInfoWindow } from "./StationInfoWindow";
 
 type ConnectorType = 'CCS' | 'CHAdeMO' | 'Type2';
-
 type PowerFilter = 'all' | 'low' | 'medium' | 'high';
 
 const powerRanges: Record<PowerFilter, [number, number]> = {
@@ -20,6 +19,27 @@ const powerRanges: Record<PowerFilter, [number, number]> = {
   high: [150, 1000],
 };
 
+function toMapStation(station: ChargingStation, chargers: Charger[]): MapStation {
+  const connectorTypes = [...new Set(chargers.map(c => c.connector_type))] as Array<'CCS' | 'CHAdeMO' | 'Type2'>;
+  const maxPower = chargers.length > 0 ? Math.max(...chargers.map(c => c.power_output)) : undefined;
+  const minPrice = chargers.length > 0 ? Math.min(...chargers.map(c => c.pricing_per_kwh)) : undefined;
+
+  const hasAvailable = chargers.some(c => c.status === 'available');
+  const allOffline = chargers.every(c => c.status === 'offline');
+  let status: 'available' | 'occupied' | 'offline' = 'occupied';
+  if (hasAvailable) status = 'available';
+  else if (allOffline || chargers.length === 0) status = 'offline';
+
+  return {
+    id: String(station.id),
+    name: station.name,
+    location: { lat: station.latitude, lng: station.longitude },
+    connector_types: connectorTypes,
+    power_output: maxPower,
+    pricing_per_kwh: minPrice,
+    status,
+  };
+}
 
 export function MapView() {
   const [mapCenter, setMapCenter] = useState<MapCoordinates>(DEFAULT_CENTER);
@@ -28,9 +48,33 @@ export function MapView() {
   const [selectedStation, setSelectedStation] = useState<MapStation | null>(null);
   const [selectedConnectors, setSelectedConnectors] = useState<ConnectorType[]>(['CCS', 'CHAdeMO', 'Type2']);
   const [selectedPowerId, setSelectedPowerId] = useState<PowerFilter>('all');
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 50]);
   const [selectedStatuses, setSelectedStatuses] = useState<StationStatus[]>(['available', 'occupied', 'offline']);
+  const [stations, setStations] = useState<MapStation[]>([]);
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+
+  // Fetch stations from backend API
+  useEffect(() => {
+    async function fetchStations() {
+      try {
+        const stationList = await stationApi.list();
+        const mapStations: MapStation[] = await Promise.all(
+          stationList.map(async (station) => {
+            try {
+              const chargers = await stationApi.chargers(String(station.id));
+              return toMapStation(station, chargers);
+            } catch {
+              return toMapStation(station, []);
+            }
+          })
+        );
+        setStations(mapStations);
+      } catch (err) {
+        console.error("Failed to fetch stations:", handleApiError(err).message);
+      }
+    }
+    fetchStations();
+  }, []);
 
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -50,31 +94,29 @@ export function MapView() {
     }
   }, []);
 
-  // Anlık Haversine — kullanıcı konumu alındığında hızlı bir başlangıç değeri verir
+  // Haversine distance
   useEffect(() => {
-    if (!userLocation) return;
+    if (!userLocation || stations.length === 0) return;
     const computed: Record<string, number> = {};
-    mockStations.forEach((station) => {
+    stations.forEach((station) => {
       computed[station.id] = haversineDistance(userLocation, station.location);
     });
     setDistances(computed);
-  }, [userLocation]);
+  }, [userLocation, stations]);
 
-  // Debounced Distance Matrix — gerçek GPS konumu alındıktan 800ms sonra sürüş mesafelerini çeker
+  // Driving distance (Routes API)
   useEffect(() => {
-    if (!userLocation) return;
-
+    if (!userLocation || stations.length === 0) return;
     let cancelled = false;
 
     const timer = setTimeout(() => {
       void (async () => {
         const computed: Record<string, number> = {};
         await Promise.allSettled(
-          mockStations.map(async (station) => {
+          stations.map(async (station) => {
             try {
               computed[station.id] = await fetchDrivingDistance(userLocation, station.location);
             } catch {
-              // API başarısız olursa Haversine ile fallback
               computed[station.id] = haversineDistance(userLocation, station.location);
             }
           }),
@@ -87,12 +129,12 @@ export function MapView() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [userLocation]);
+  }, [userLocation, stations]);
 
   const filteredStations = useMemo(() => {
     const [minPower, maxPower] = powerRanges[selectedPowerId];
 
-    return mockStations.filter((station) => {
+    return stations.filter((station) => {
       const connectorMatch =
         selectedConnectors.length === 0
           ? true
@@ -112,7 +154,7 @@ export function MapView() {
 
       return connectorMatch && powerMatch && priceMatch && statusMatch;
     });
-  }, [selectedConnectors, selectedPowerId, priceRange, selectedStatuses]);
+  }, [stations, selectedConnectors, selectedPowerId, priceRange, selectedStatuses]);
 
   const handleConnectorChange = (connector: ConnectorType, checked: boolean) => {
     setSelectedConnectors((current) => {
@@ -139,12 +181,11 @@ export function MapView() {
   const handleReset = () => {
     setSelectedConnectors(['CCS', 'CHAdeMO', 'Type2']);
     setSelectedPowerId('all');
-    setPriceRange([0, 10]);
+    setPriceRange([0, 50]);
     setSelectedStatuses(['available', 'occupied', 'offline']);
     setSelectedStation(null);
   };
 
-  // InfoWindow'u kapat — seçili istasyon filtre dışına çıktıysa
   useEffect(() => {
     if (selectedStation && !filteredStations.some((s) => s.id === selectedStation.id)) {
       setSelectedStation(null);

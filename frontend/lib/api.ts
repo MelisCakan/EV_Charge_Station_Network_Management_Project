@@ -1,7 +1,7 @@
 'use client';
 
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { ChargingStation } from './types';
+import { Charger, ChargingStation } from './types';
 
 export interface ApiError {
   message: string;
@@ -141,16 +141,8 @@ export const stationApi = {
     const response = await api.get<ChargingStation>(`/stations/${stationId}`);
     return response.data;
   },
-  create: async (payload: StationPayload) => {
-    const response = await api.post<ChargingStation>('/stations', payload);
-    return response.data;
-  },
-  update: async (stationId: string, payload: Partial<StationPayload>) => {
-    const response = await api.put<ChargingStation>(`/stations/${stationId}`, payload);
-    return response.data;
-  },
-  delete: async (stationId: string) => {
-    const response = await api.delete(`/stations/${stationId}`);
+  chargers: async (stationId: string) => {
+    const response = await api.get<Charger[]>(`/stations/${stationId}/chargers`);
     return response.data;
   },
 };

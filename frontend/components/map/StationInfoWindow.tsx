@@ -87,6 +87,24 @@ export function StationInfoWindow({ station, distanceKm, onClose }: StationInfoW
             {distanceKm.toFixed(1)} km uzakta
           </div>
         )}
+
+        <a
+          href={`/stations/${station.id}`}
+          style={{
+            display: "block",
+            marginTop: 10,
+            padding: "6px 12px",
+            borderRadius: 8,
+            background: "#0B3E34",
+            color: "#F2F2F0",
+            fontSize: 13,
+            fontWeight: 600,
+            textAlign: "center",
+            textDecoration: "none",
+          }}
+        >
+          View Details
+        </a>
       </div>
     </InfoWindow>
   );

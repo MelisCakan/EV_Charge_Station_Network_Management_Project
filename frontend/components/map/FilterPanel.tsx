@@ -150,18 +150,18 @@ export function FilterPanel({
         <div className="space-y-3 rounded-3xl border border-[#13423a]/80 bg-[#042117]/95 p-4">
           <div className="flex items-center justify-between gap-4">
             <p className="text-sm font-semibold text-white">Price range</p>
-            <span className="text-xs text-[#D9D5D2]/80">${priceRange[0].toFixed(1)} - ${priceRange[1].toFixed(1)}</span>
+            <span className="text-xs text-[#D9D5D2]/80">{priceRange[0].toFixed(1)} - {priceRange[1].toFixed(1)} TL</span>
           </div>
           <div className="space-y-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3 text-xs text-[#D9D5D2]/80">
                 <span>Min</span>
-                <span>${priceRange[0].toFixed(1)}</span>
+                <span>{priceRange[0].toFixed(1)} TL</span>
               </div>
               <input
                 type="range"
                 min={0}
-                max={10}
+                max={50}
                 step={0.1}
                 value={priceRange[0]}
                 onChange={handlePriceMinChange}
@@ -171,12 +171,12 @@ export function FilterPanel({
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3 text-xs text-[#D9D5D2]/80">
                 <span>Max</span>
-                <span>${priceRange[1].toFixed(1)}</span>
+                <span>{priceRange[1].toFixed(1)} TL</span>
               </div>
               <input
                 type="range"
                 min={0}
-                max={10}
+                max={50}
                 step={0.1}
                 value={priceRange[1]}
                 onChange={handlePriceMaxChange}

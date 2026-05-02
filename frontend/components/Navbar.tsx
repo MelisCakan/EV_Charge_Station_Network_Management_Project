@@ -34,23 +34,19 @@ export function Navbar() {
           {/* Navigation Links */}
           <div className="hidden md:flex items-center gap-8">
             <Link
-              href="/stations"
+              href="/"
               className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
             >
-              Stations
+              Map
             </Link>
-            <Link
-              href="/pricing"
-              className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-            >
-              Pricing
-            </Link>
-            <Link
-              href="/about"
-              className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-            >
-              About
-            </Link>
+            {isAuthenticated && (
+              <Link
+                href="/vehicles"
+                className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+              >
+                My Vehicles
+              </Link>
+            )}
           </div>
 
           {/* Auth Buttons */}
