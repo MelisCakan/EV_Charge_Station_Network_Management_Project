@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import { Plus, Edit3, Trash2, X } from 'lucide-react';
 import { Vehicle } from '@/lib/types';
 import { vehicleApi, handleApiError } from '@/lib/api';
-import { sampleVehicles } from '@/lib/mockData';
 
 const brandOptions = ['Tesla', 'Nissan', 'Audi', 'BMW', 'Hyundai', 'Volkswagen'];
 const connectorOptions: Vehicle['connector_type'][] = ['CCS', 'CHAdeMO', 'Type2'];
@@ -27,7 +26,7 @@ interface FormErrors {
 }
 
 export default function VehiclesPage() {
-  const [vehicles, setVehicles] = useState<Vehicle[]>(sampleVehicles);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
@@ -45,11 +44,11 @@ export default function VehiclesPage() {
     setApiError(null);
     try {
       const data = await vehicleApi.list();
-      setVehicles(data || sampleVehicles);
+      setVehicles(data || []);
     } catch (error) {
       const apiErr = handleApiError(error);
       setApiError(apiErr.message);
-      setVehicles(sampleVehicles);
+      setVehicles([]);
     } finally {
       setIsLoading(false);
     }
