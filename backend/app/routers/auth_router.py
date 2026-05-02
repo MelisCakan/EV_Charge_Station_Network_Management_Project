@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.core.security import hash_password, verify_password, create_access_token, decode_access_token
 from app.core.dependencies import get_current_user
-from app.core.config import ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
+from app.config import ACCESS_TOKEN_EXPIRE_MINUTES, SECRET_KEY
 from app.database import get_session
 from app.models.user import User
 from app.models.wallet import Wallet

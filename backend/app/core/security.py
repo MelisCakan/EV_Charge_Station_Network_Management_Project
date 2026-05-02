@@ -3,7 +3,7 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 from typing import Optional
 
-from app.core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from app.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 # -------------------
 # PASSWORD HASHING

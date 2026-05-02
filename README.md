@@ -12,21 +12,22 @@ Group 14 - Fundamentals of Software Engineering Project
 
 ## Mimari
 - **Pattern:** Client-Server + Layered Architecture (Sommerville Ch.6)
-- **Backend:** FastAPI (Python) - Layer 2 (Routers) + Layer 3 (Services) + Layer 4 (Database)
-- **Frontend:** Next.js 14 (TypeScript) - Layer 1 (Presentation)
-- **Database:** PostgreSQL with SQLModel ORM
-- **Maps:** Google Maps API
+- **Backend:** FastAPI (Python 3.11) - Layer 2 (Routers) + Layer 3 (Services) + Layer 4 (Database)
+- **Frontend:** Next.js 16 (TypeScript, React 19) - Layer 1 (Presentation)
+- **Database:** PostgreSQL 17 with SQLModel ORM
+- **Maps:** Google Maps API (@vis.gl/react-google-maps)
 
 ## Proje Yapisi
 ```
-ev-charging-station/
-├── backend/                   # FastAPI server (Layer 2-4)
+EV_Charge_Station_Network_Management_Project/
+├── backend/
 │   ├── app/
 │   │   ├── models/            # SQLModel entities (13 dosya, 16 domain sinifi)
 │   │   ├── repositories/      # Repository Pattern (BaseRepository + 14 model repo)
 │   │   ├── routers/           # API endpoints (Layer 2)
-│   │   ├── services/          # Business logic (Layer 3) - Faz 2+
-│   │   ├── core/              # security.py, dependencies.py
+│   │   ├── services/          # Business logic (Layer 3)
+│   │   ├── schemas/           # Pydantic request/response schemalar
+│   │   ├── core/              # security.py, dependencies.py, config.py
 │   │   ├── main.py            # FastAPI app
 │   │   ├── config.py          # Environment variables
 │   │   ├── database.py        # SQLModel engine
@@ -34,17 +35,18 @@ ev-charging-station/
 │   ├── alembic/               # Database migration dosyalari
 │   ├── requirements.txt       # Python bagimliliklari
 │   └── .env.example           # Ornek environment dosyasi
-├── frontend/                  # Next.js client (Layer 1)
-│   ├── src/
-│   │   ├── app/               # Sayfalar (App Router)
-│   │   ├── components/        # React componentleri
-│   │   ├── lib/               # API client, auth, types
-│   │   └── hooks/             # Custom hooks - Faz 2+
+├── frontend/
+│   ├── app/                   # Sayfalar (Next.js App Router)
+│   │   ├── auth/              # Login & Register sayfalari
+│   │   ├── layout.tsx         # Root layout
+│   │   └── page.tsx           # Ana sayfa (harita)
+│   ├── components/            # React componentleri (Navbar, Footer, ui/)
+│   ├── lib/                   # API client, AuthContext, types
 │   └── package.json
 ├── docs/
 │   ├── diagrams/              # PlantUML & DrawIO diagramlar
 │   └── planning/              # Faz planlari (faz1-4)
-└── README.md                  # Bu dosya
+└── README.md
 ```
 
 ---
@@ -66,19 +68,20 @@ ev-charging-station/
 ### 1.2 Veritabani Olusturma (pgAdmin)
 
 1. pgAdmin'i ac
-2. Sol panelde Servers > PostgreSQL'e sag tikla > Login Role/User olustur (opsiyonel, `postgres` kullanabilirsin)
-3. Databases'e sag tikla > Create > Database
-   - Name: `ev_charging`
+2. Sol panelde Servers > PostgreSQL > Databases'e sag tikla > Create > Database
+   - Name: `fse_project`
    - Save
 
 ### 1.3 Python Kurulumu
 
-Python 3.10+ gerekli: https://www.python.org/downloads/
+Python 3.11+ gerekli: https://www.python.org/downloads/
 
 ```bash
-python --version
-# Python 3.10+ gormelisin
+python3 --version
+# Python 3.11+ gormelisin
 ```
+
+> **Not:** Python 3.14 bu projeyle uyumlu degil (psycopg2 desteklemiyor). 3.11 veya 3.12 kullan.
 
 ### 1.4 Node.js Kurulumu
 
@@ -105,12 +108,17 @@ git clone https://github.com/MelisCakan/EV_Charge_Station_Network_Management_Pro
 cd EV_Charge_Station_Network_Management_Project
 ```
 
-### Adim 2: Backend kurulumu
+### Adim 2: Calisma branch'ine gec
+```bash
+git checkout feature/faz2-yigit
+```
+
+### Adim 3: Backend kurulumu
 ```bash
 cd backend
 
 # Virtual environment olustur
-python -m venv venv
+python3 -m venv venv
 
 # Aktif et
 # Mac/Linux:
@@ -120,21 +128,22 @@ venv\Scripts\activate
 
 # Bagimliliklari yukle
 pip install -r requirements.txt
+```
 
-# .env dosyasini olustur
+### Adim 4: Backend .env dosyasini olustur
+```bash
 cp .env.example .env
 ```
 
-### Adim 3: .env dosyasini duzenle
 `backend/.env` dosyasini ac ve PostgreSQL bilgilerini gir:
 ```
-DATABASE_URL=postgresql://postgres:SENIN_SIFREN@localhost:5432/ev_charging
-SECRET_KEY=your-secret-key-change-in-production
-GOOGLE_MAPS_API_KEY=your-google-maps-api-key
+DATABASE_URL=postgresql://postgres:SENIN_SIFREN@localhost:5432/fse_project
+SECRET_KEY=dev-secret-key-change-in-production
+GOOGLE_MAPS_API_KEY=
 ```
 > `SENIN_SIFREN` yerine PostgreSQL kurulumunda belirledigin sifreyi yaz.
 
-### Adim 4: Migration ve Seed calistir
+### Adim 5: Migration ve Seed calistir
 ```bash
 # Tablolari olustur
 alembic upgrade head
@@ -143,21 +152,30 @@ alembic upgrade head
 python -m app.seed
 ```
 
-### Adim 5: Backend'i baslat
+### Adim 6: Backend'i baslat
 ```bash
 uvicorn app.main:app --reload --port 8000
 ```
-Tarayicida ac: http://localhost:8000 → `{"message": "EV Charging Station API"}`
-API dokumantasyonu: http://localhost:8000/docs
+- API root: http://localhost:8000
+- Swagger docs: http://localhost:8000/docs
 
-### Adim 6: Frontend kurulumu (yeni terminal ac)
+### Adim 7: Frontend kurulumu (yeni terminal ac)
 ```bash
 cd frontend
 
 # Bagimliliklari yukle
 npm install
+```
 
-# Frontend'i baslat
+### Adim 8: Frontend .env.local dosyasini olustur
+`frontend/.env.local` dosyasini olustur:
+```
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
+```
+
+### Adim 9: Frontend'i baslat
+```bash
 npm run dev
 ```
 Tarayicida ac: http://localhost:3000
@@ -183,47 +201,53 @@ uvicorn app.main:app --reload --port 8000
 cd frontend
 npm install   # yeni paket eklendiyse
 npm run dev
-
-# 4. Kodunu yaz
-#   Backend dosyalarini degistirince → otomatik restart olur (--reload)
-#   Frontend dosyalarini degistirince → otomatik refresh olur (next dev)
 ```
 
 ---
 
-## 4. Backend Gelistirme (Orcun + Yigit)
+## 4. API Endpointleri (Mevcut)
 
-### Yeni Router/Endpoint Ekleme Ornegi
+### Auth (`/auth`)
+| Method | Endpoint | Aciklama | Auth |
+|--------|----------|----------|------|
+| POST | `/auth/register` | Yeni kullanici kaydi + wallet olusturma | - |
+| POST | `/auth/login` | JWT token al (24 saat gecerli) | - |
+| GET | `/auth/me` | Giris yapan kullanici bilgisi | Bearer Token |
+| POST | `/auth/password-reset-request` | Sifre sifirlama token'i al (15dk) | - |
+| POST | `/auth/password-reset` | Yeni sifre belirle | - |
 
-Diyelim `station_router.py` ekleyeceksin:
+### Vehicles (`/vehicles`)
+| Method | Endpoint | Aciklama | Auth |
+|--------|----------|----------|------|
+| GET | `/vehicles` | Kullanicinin araclari | Bearer Token |
+| POST | `/vehicles` | Yeni arac kaydi | Bearer Token |
+| GET | `/vehicles/{id}` | Arac detayi | Bearer Token |
+| PUT | `/vehicles/{id}` | Arac guncelle | Bearer Token |
+| DELETE | `/vehicles/{id}` | Arac sil | Bearer Token |
+| GET | `/vehicles/{id}/compatibility/{charger_id}` | Uyumluluk kontrolu (REQ 7.2) | Bearer Token |
 
-**1. Dosyayi olustur:**
-```
-backend/app/routers/station_router.py
-```
+### Stations (`/stations`)
+| Method | Endpoint | Aciklama | Auth |
+|--------|----------|----------|------|
+| GET | `/stations` | Tum istasyonlar (?city=X, ?status=active) | - |
+| GET | `/stations/{id}` | Istasyon detayi | - |
+| GET | `/stations/{id}/chargers` | Istasyonun charger'lari (?connector_type=CCS, ?status=available) | - |
 
-**2. Router'i yaz:**
+---
+
+## 5. Backend Gelistirme
+
+### Yeni Router Ekleme Adimi
+
+1. Schema olustur: `app/schemas/yeni_schema.py`
+2. Router olustur: `app/routers/yeni_router.py`
+3. `app/main.py`'ye ekle:
 ```python
-from fastapi import APIRouter, Depends
-from sqlmodel import Session
-from app.database import get_session
-from app.repositories.station_repository import StationRepository
-
-router = APIRouter()
-
-@router.get("/")
-def list_stations(session: Session = Depends(get_session)):
-    repo = StationRepository(session)
-    return repo.get_active()
+from app.routers.yeni_router import router as yeni_router
+app.include_router(yeni_router)
 ```
-
-**3. `main.py`'ye ekle:**
-```python
-from app.routers.station_router import router as station_router
-app.include_router(station_router, prefix="/stations", tags=["Stations"])
-```
-
-**4. Kaydet → backend otomatik restart olur → http://localhost:8000/docs'tan test et**
+4. Kaydet → backend otomatik restart olur (`--reload`)
+5. http://localhost:8000/docs'tan test et
 
 ### Alembic Migration (Yeni Model/Kolon Eklediysen)
 
@@ -232,56 +256,46 @@ cd backend
 source venv/bin/activate
 
 # Yeni migration olustur
-alembic revision --autogenerate -m "add station_rating column"
+alembic revision --autogenerate -m "aciklama"
 
 # Migration'i uygula
 alembic upgrade head
-
-# Seed data'yi tekrar yukle (DB'yi sifirladiysan)
-python -m app.seed
 ```
 
 ### Veritabani Sifirlama (Gerekirse)
 
 ```bash
-# pgAdmin'den ev_charging DB'sini sil ve yeniden olustur, sonra:
+# pgAdmin'den fse_project DB'sini sil ve yeniden olustur, sonra:
 alembic upgrade head
 python -m app.seed
 ```
 
 ---
 
-## 5. Frontend Gelistirme (Melis + G. Ege)
+## 6. Frontend Gelistirme
 
-### Yeni Sayfa Ekleme Ornegi
+### Yeni Sayfa Ekleme
 
 Next.js App Router kullaniyoruz. Yeni sayfa = yeni klasor + `page.tsx`.
 
-**1. Sayfa dosyasini olustur:**
 ```
-frontend/src/app/stations/[id]/page.tsx
+frontend/app/vehicles/page.tsx        → /vehicles
+frontend/app/stations/[id]/page.tsx   → /stations/1, /stations/2, ...
 ```
 
-**2. Sayfayi yaz:**
+### API Cagrisi Ornegi
+
 ```tsx
-"use client";
-import { useEffect, useState } from "react";
+import { api } from '@/lib/api';
 
-export default function StationDetail({ params }: { params: { id: string } }) {
-  const [station, setStation] = useState(null);
+// GET (auth gerektiren)
+const response = await api.get('/vehicles');
 
-  useEffect(() => {
-    fetch(`http://localhost:8000/stations/${params.id}`)
-      .then(res => res.json())
-      .then(data => setStation(data));
-  }, [params.id]);
-
-  if (!station) return <div>Yukleniyor...</div>;
-  return <h1>{station.name}</h1>;
-}
+// POST
+const response = await api.post('/vehicles', { brand: "Tesla", ... });
 ```
 
-**3. Kaydet → http://localhost:3000/stations/1 adresinde gorunur**
+> `lib/api.ts` icindeki axios instance otomatik olarak Bearer token ekler.
 
 ### Yeni npm Paketi Ekleme
 
@@ -292,15 +306,15 @@ npm install paket-adi
 
 ---
 
-## 6. Veritabani Yonetimi
+## 7. Veritabani
 
-### pgAdmin ile Baglanti
+### pgAdmin Baglanti Bilgileri
 
 | Ayar | Deger |
 |------|-------|
 | Host | `localhost` |
 | Port | `5432` |
-| Database | `ev_charging` |
+| Database | `fse_project` |
 | Username | `postgres` |
 | Password | (kurulumda belirledigin sifre) |
 
@@ -310,7 +324,7 @@ npm install paket-adi
 
 | Tablo | Aciklama |
 |-------|----------|
-| `user` | EVDriver + StationOperator + SystemAdministrator (tek tablo) |
+| `user` | EVDriver + StationOperator + SystemAdministrator (tek tablo, role field) |
 | `vehicle` | Kullanici araclari |
 | `charging_stations` | Sarj istasyonlari |
 | `charger` | Istasyondaki sarj cihazlari |
@@ -323,61 +337,62 @@ npm install paket-adi
 | `issue_reports` | Ariza raporlari |
 | `maintenance_notes` | Bakim notlari |
 | `favorite_stations` | Favori istasyonlar |
-| `report` | Admin raporlari |
 
 ---
 
-## 7. Git Workflow
+## 8. Git Workflow
 
 ### Branch Stratejisi
 ```
 main                              ← kararli, calisan kod (direkt push YAPMA)
-  └── feature/gorev-X-aciklama    ← her gorev icin ayri branch
+  └── feature/faz2-yigit          ← aktif gelistirme branch'i
 ```
 
-### Yeni Ozellik Ekleme (Adim Adim)
+### Degisiklikleri Push Etme
 
 ```bash
-# 1. main branch'e gec ve guncelle
-git checkout main
-git pull
+# 1. Degisikliklerini commit et
+git add backend/app/routers/yeni_router.py backend/app/main.py
+git commit -m "Gorev X.Y: Aciklama"
 
-# 2. Yeni branch olustur
-git checkout -b feature/gorev-2.1-station-router
-
-# 3. Kodunu yaz ve test et
-
-# 4. Degisikliklerini commit et
-git add backend/app/routers/station_router.py backend/app/main.py
-git commit -m "Gorev 2.1: Station CRUD router with list/detail endpoints"
-
-# 5. Branch'i GitHub'a pushla
-git push -u origin feature/gorev-2.1-station-router
-
-# 6. GitHub'da Pull Request (PR) ac
-#    "Compare & pull request" butonuna tikla
-
-# 7. Takim arkadaslarin review etsin → Approve → Merge
+# 2. Push
+git push
 ```
 
 ### Onemli Kurallar
-- `main` branch'e direkt commit YAPMA, her zaman feature branch ac
-- Commit mesajlarini anlamli yaz: `"Gorev 2.1: Station list endpoint"`
-- Migration dosyalarini mutlaka commit et (baskalarinin DB'si seninkiyle sync kalsin)
+- `main` branch'e direkt commit YAPMA
+- Commit mesajlarini anlamli yaz: `"Gorev 2.4: Reservation service with 3 business rules"`
+- Migration dosyalarini mutlaka commit et
 - `.env` dosyasini ASLA commit etme (zaten `.gitignore`'da)
 
 ---
 
-## 8. Sorun Giderme
+## 9. Test Kullanicilari (Seed Data)
+
+`python -m app.seed` ile yuklenir:
+
+| Email | Sifre | Rol | Aciklama |
+|-------|-------|-----|----------|
+| driver@test.com | Driver123 | driver | EV surucu (rezervasyon, sarj, odeme) |
+| operator@test.com | Operator123 | operator | Istasyon operatoru (bakim, ariza) |
+| admin@test.com | Admin123 | admin | Sistem yoneticisi (raporlar, atamalar) |
+
+**Araclar:** Tesla Model 3 (CCS), Nissan Leaf (CHAdeMO) - driver'a ait
+**Istasyonlar:** Karsiyaka Hub, Bornova Station, Buca Point (her biri 1 AC + 1 DC charger)
+**Cuzdanlar:** Her kullanicida 500 TL bakiye
+
+---
+
+## 10. Sorun Giderme
 
 ### "Connection refused" / DB baglanti hatasi
-- pgAdmin'den ev_charging DB'sinin var oldugundan emin ol
+- pgAdmin'den `fse_project` DB'sinin var oldugundan emin ol
 - `.env` dosyasindaki `DATABASE_URL`'i kontrol et (sifre dogru mu?)
 - PostgreSQL servisinin calistigindan emin ol
 
 ### Migration hatasi
 ```bash
-# Tablolari sifirla: pgAdmin'den ev_charging DB'sini drop et, yeniden olustur
+# Tablolari sifirla: pgAdmin'den fse_project DB'sini drop et, yeniden olustur
 alembic upgrade head
 python -m app.seed
 ```
@@ -396,28 +411,8 @@ rm -rf node_modules
 npm install
 ```
 
----
-
-## 9. Test Kullanicilari (Seed Data)
-
-`python -m app.seed` ile yuklenir:
-
-| Email | Sifre | Rol | Aciklama |
-|-------|-------|-----|----------|
-| driver@test.com | Driver123 | driver | EV surucu (rezervasyon, sarj, odeme) |
-| operator@test.com | Operator123 | operator | Istasyon operatoru (bakim, ariza) |
-| admin@test.com | Admin123 | admin | Sistem yoneticisi (raporlar, atamalar) |
-
-**Araclar:** Tesla Model 3 (CCS), Nissan Leaf (CHAdeMO) - driver'a ait
-**Istasyonlar:** Karsiyaka Hub, Bornova Station, Buca Point
-**Cuzdanlar:** Her kullanicida 500 TL bakiye
-
----
-
-## 10. API Dokumantasyonu
-
-Backend calisirken http://localhost:8000/docs adresinde Swagger UI acilir.
-Buradan tum endpoint'leri gorebilir ve direkt test edebilirsin.
+### Python 3.14 uyumsuzluk
+`psycopg2-binary` Python 3.14 ile calismaz. Python 3.11 veya 3.12 kullan.
 
 ---
 
@@ -425,4 +420,4 @@ Buradan tum endpoint'leri gorebilir ve direkt test edebilirsin.
 - 90 gereksinim, 9 viewpoint (Sommerville Ch.4)
 - 3 Use Case: Reservation (UC1), Charging (UC2), Maintenance (UC3)
 - 16 domain sinifi, 13 DB tablosu (EER generalization)
-# EV_Charge_Station_Network_Management_Project
+- Repository Pattern + Layered Architecture
