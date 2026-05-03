@@ -44,6 +44,7 @@ export interface ProfileResponse {
 }
 
 const MOCK_TOKEN = 'mock-token';
+const MOCK_PASSWORD = 'demo123';
 const MOCK_USER: ProfileResponse = {
   id: 1,
   email: 'demo@evcharge.test',
@@ -171,7 +172,7 @@ export const authApi = {
       return response.data;
     } catch (error) {
       if (isNetworkOrNotFoundError(error)) {
-        if (payload.email === MOCK_USER.email) {
+        if (payload.email === MOCK_USER.email && payload.password === MOCK_PASSWORD) {
           return { access_token: MOCK_TOKEN, token_type: 'bearer' };
         }
         throw new Error('Invalid credentials');
@@ -270,17 +271,131 @@ export const vehicleApi = {
   },
 };
 
+const MOCK_STATIONS: ChargingStation[] = [
+  {
+    id: 101,
+    name: 'Seaside EV Hub',
+    latitude: 38.4300,
+    longitude: 27.1450,
+    address: 'Kordonboyu, İzmir',
+    city: 'İzmir',
+    operating_hours: '08:00-22:00',
+    status: 'active',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 102,
+    name: 'Downtown Fast Charge',
+    latitude: 38.4220,
+    longitude: 27.1410,
+    address: 'Konak, İzmir',
+    city: 'İzmir',
+    operating_hours: '07:00-23:00',
+    status: 'active',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 103,
+    name: 'Green Valley Station',
+    latitude: 38.4190,
+    longitude: 27.1500,
+    address: 'Bostanlı, İzmir',
+    city: 'İzmir',
+    operating_hours: '09:00-20:00',
+    status: 'active',
+    created_at: new Date().toISOString(),
+  },
+];
+
+const MOCK_CHARGERS: Record<number, Charger[]> = {
+  101: [
+    { id: 1001, station_id: 101, charger_code: 'DC Fast #1', charger_type: 'DC', power_output: 120, connector_type: 'CCS', pricing_per_kwh: 3.5, status: 'available' },
+    { id: 1002, station_id: 101, charger_code: 'AC Slow #2', charger_type: 'AC', power_output: 22, connector_type: 'Type2', pricing_per_kwh: 2.0, status: 'available' },
+  ],
+  102: [
+    { id: 1003, station_id: 102, charger_code: 'CHAdeMO Speed', charger_type: 'DC', power_output: 50, connector_type: 'CHAdeMO', pricing_per_kwh: 2.8, status: 'available' },
+    { id: 1004, station_id: 102, charger_code: 'CCS Rapid', charger_type: 'DC', power_output: 50, connector_type: 'CCS', pricing_per_kwh: 2.8, status: 'occupied' },
+  ],
+  103: [
+    { id: 1005, station_id: 103, charger_code: 'Type2 Standard', charger_type: 'AC', power_output: 22, connector_type: 'Type2', pricing_per_kwh: 2.2, status: 'occupied' },
+  ],
+};
+
 export const stationApi = {
   list: async () => {
-    const response = await api.get<ChargingStation[]>('/stations');
-    return response.data;
+    try {
+      const response = await api.get<ChargingStation[]>('/stations');
+      return response.data;
+    } catch (error) {
+      if (isNetworkOrNotFoundError(error)) {
+        return MOCK_STATIONS;
+      }
+      throw error;
+    }
   },
   details: async (stationId: string) => {
-    const response = await api.get<ChargingStation>(`/stations/${stationId}`);
-    return response.data;
+    try {
+      const response = await api.get<ChargingStation>(`/stations/${stationId}`);
+      return response.data;
+    } catch (error) {
+      if (isNetworkOrNotFoundError(error)) {
+        const mock = MOCK_STATIONS.find((station) => String(station.id) === stationId);
+        if (mock) return mock;
+      }
+      throw error;
+    }
   },
   chargers: async (stationId: string) => {
-    const response = await api.get<Charger[]>(`/stations/${stationId}/chargers`);
+    try {
+      const response = await api.get<Charger[]>(`/stations/${stationId}/chargers`);
+      return response.data;
+    } catch (error) {
+      if (isNetworkOrNotFoundError(error)) {
+        return MOCK_CHARGERS[Number(stationId)] ?? [];
+      }
+      throw error;
+    }
+  },
+};
+
+export const reservationApi = {
+  list: async () => {
+    try {
+      const response = await api.get('/reservations');
+      return response.data;
+    } catch (error) {
+      if (isNetworkOrNotFoundError(error)) {
+        return [];
+      }
+      throw error;
+    }
+  },
+  create: async (payload: any) => {
+    try {
+      const response = await api.post('/reservations', payload);
+      return response.data;
+    } catch (error) {
+      if (isNetworkOrNotFoundError(error)) {
+        const start = new Date(payload.start_time);
+        const end = new Date(start.getTime() + payload.duration_minutes * 60000);
+        return {
+          id: Math.floor(Math.random() * 100000) + 1000,
+          user_id: 1,
+          vehicle_id: payload.vehicle_id,
+          station_id: payload.station_id,
+          charger_id: payload.charger_id,
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+          status: 'confirmed',
+          total_cost: null,
+          created_at: new Date().toISOString(),
+        };
+      }
+      throw error;
+    }
+  },
+  cancel: async (reservationId: number) => {
+    const response = await api.delete(`/reservations/${reservationId}`);
     return response.data;
   },
 };

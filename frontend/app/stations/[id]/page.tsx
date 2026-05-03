@@ -18,11 +18,44 @@ const chargerTypeStyles: Record<string, string> = {
   DC: 'bg-violet-500/10 text-violet-300',
 };
 
+const timeSlotTemplates = [
+  { label: '08:00', value: '08:00' },
+  { label: '10:00', value: '10:00' },
+  { label: '12:00', value: '12:00' },
+  { label: '14:00', value: '14:00' },
+  { label: '16:00', value: '16:00' },
+];
+
+function buildAvailabilityOptions(charger: Charger) {
+  if (charger.status === 'available') {
+    return timeSlotTemplates.map((slot) => ({
+      value: slot.value,
+      label: `${slot.label} — Available`,
+      disabled: false,
+    }));
+  }
+
+  if (charger.status === 'occupied') {
+    return [{
+      value: 'occupied',
+      label: 'Currently occupied',
+      disabled: true,
+    }];
+  }
+
+  return [{
+    value: 'offline',
+    label: 'Offline for maintenance',
+    disabled: true,
+  }];
+}
+
 export default function StationDetailsPage() {
   const params = useParams();
   const stationId = params.id as string;
   const [station, setStation] = useState<ChargingStation | null>(null);
   const [chargers, setChargers] = useState<Charger[]>([]);
+  const [selectedTimeByCharger, setSelectedTimeByCharger] = useState<Record<number, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -37,6 +70,15 @@ export default function StationDetailsPage() {
         ]);
         setStation(stationData);
         setChargers(chargersData);
+
+        const initialTimes: Record<number, string> = {};
+        chargersData.forEach((charger) => {
+          const options = buildAvailabilityOptions(charger);
+          if (options.length > 0 && !options[0].disabled) {
+            initialTimes[charger.id] = options[0].value;
+          }
+        });
+        setSelectedTimeByCharger(initialTimes);
       } catch (err) {
         const apiErr = handleApiError(err);
         setError(apiErr.message);
@@ -106,50 +148,78 @@ export default function StationDetailsPage() {
           </div>
 
           <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {chargers.map((charger) => (
-              <div
-                key={charger.id}
-                className="rounded-[24px] border border-[#18423b]/80 bg-[#042117]/95 p-6 shadow-[0_24px_50px_rgba(0,0,0,0.25)]"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.24em] text-[#70B4A6]">{charger.charger_code}</p>
-                    <h2 className="mt-3 text-xl font-semibold text-white">{charger.connector_type}</h2>
+            {chargers.map((charger) => {
+              const availabilityOptions = buildAvailabilityOptions(charger);
+              const selectedTime = selectedTimeByCharger[charger.id] ?? availabilityOptions[0]?.value;
+              const reserveHref = `/reservations/new?station=${station.id}&charger=${charger.id}${selectedTime ? `&datetime=${encodeURIComponent(`${new Date().toISOString().slice(0, 10)}T${selectedTime}`)}` : ''}`;
+
+              return (
+                <div
+                  key={charger.id}
+                  className="rounded-[24px] border border-[#18423b]/80 bg-[#042117]/95 p-6 shadow-[0_24px_50px_rgba(0,0,0,0.25)]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm uppercase tracking-[0.24em] text-[#70B4A6]">{charger.charger_code}</p>
+                      <h2 className="mt-3 text-xl font-semibold text-white">{charger.connector_type}</h2>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${chargerTypeStyles[charger.charger_type] || ''}`}>
+                      {charger.charger_type}
+                    </span>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${chargerTypeStyles[charger.charger_type] || ''}`}>
-                    {charger.charger_type}
-                  </span>
+
+                  <div className="mt-6 space-y-4">
+                    <div className="flex items-center gap-3 rounded-3xl border border-[#13423a]/80 bg-[#031912]/95 px-4 py-4">
+                      <BatteryCharging className="h-4 w-4 text-[#6BC0A4]" />
+                      <div>
+                        <p className="text-sm text-[#D9D5D2]">Power</p>
+                        <p className="text-lg font-semibold text-white">{charger.power_output} kW</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 rounded-3xl border border-[#13423a]/80 bg-[#031912]/95 px-4 py-4">
+                      <DollarSign className="h-4 w-4 text-[#6BC0A4]" />
+                      <div>
+                        <p className="text-sm text-[#D9D5D2]">Price / kWh</p>
+                        <p className="text-lg font-semibold text-white">{charger.pricing_per_kwh.toFixed(2)} TL</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 rounded-3xl border border-[#13423a]/80 bg-[#031912]/95 px-4 py-4">
+                      <Wifi className="h-4 w-4 text-[#6BC0A4]" />
+                      <div>
+                        <p className="text-sm text-[#D9D5D2]">Status</p>
+                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[charger.status] || ''}`}>
+                          {charger.status}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 space-y-3">
+                    <label className="block text-sm text-[#D9D5D2]">Availability</label>
+                    <select
+                      value={selectedTime}
+                      onChange={(event) => setSelectedTimeByCharger((prev) => ({ ...prev, [charger.id]: event.target.value }))}
+                      className="w-full rounded-3xl border border-[#4C736F] bg-[#02110F] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/30"
+                    >
+                      {availabilityOptions.map((option) => (
+                        <option key={option.value} value={option.value} disabled={option.disabled}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <a
+                      href={reserveHref}
+                      className={`inline-flex w-full items-center justify-center rounded-3xl px-4 py-3 text-sm font-semibold transition ${charger.status === 'available' ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'cursor-not-allowed bg-[#334155] text-[#94A3B8]'}`}
+                      aria-disabled={charger.status !== 'available'}
+                    >
+                      Reserve this charger
+                    </a>
+                  </div>
                 </div>
-
-                <div className="mt-6 space-y-4">
-                  <div className="flex items-center gap-3 rounded-3xl border border-[#13423a]/80 bg-[#031912]/95 px-4 py-4">
-                    <BatteryCharging className="h-4 w-4 text-[#6BC0A4]" />
-                    <div>
-                      <p className="text-sm text-[#D9D5D2]">Power</p>
-                      <p className="text-lg font-semibold text-white">{charger.power_output} kW</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 rounded-3xl border border-[#13423a]/80 bg-[#031912]/95 px-4 py-4">
-                    <DollarSign className="h-4 w-4 text-[#6BC0A4]" />
-                    <div>
-                      <p className="text-sm text-[#D9D5D2]">Price / kWh</p>
-                      <p className="text-lg font-semibold text-white">{charger.pricing_per_kwh.toFixed(2)} TL</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 rounded-3xl border border-[#13423a]/80 bg-[#031912]/95 px-4 py-4">
-                    <Wifi className="h-4 w-4 text-[#6BC0A4]" />
-                    <div>
-                      <p className="text-sm text-[#D9D5D2]">Status</p>
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[charger.status] || ''}`}>
-                        {charger.status}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>

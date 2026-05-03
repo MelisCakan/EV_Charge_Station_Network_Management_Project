@@ -63,12 +63,21 @@ export interface Reservation {
   id: number;
   user_id: number;
   vehicle_id: number;
+  station_id: number;
   charger_id: number;
-  date: string;
   start_time: string;
   end_time: string;
-  status: 'confirmed' | 'cancelled' | 'completed';
+  status: 'confirmed' | 'cancelled' | 'completed' | 'no_show';
+  total_cost: number | null;
   created_at: string;
+}
+
+export interface ReservationCreate {
+  vehicle_id: number;
+  station_id: number;
+  charger_id: number;
+  start_time: string;
+  duration_minutes: number;
 }
 
 export interface ChargingSession {

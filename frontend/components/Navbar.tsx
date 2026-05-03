@@ -42,6 +42,18 @@ export function Navbar() {
             {isAuthenticated ? (
               <>
                 <Link
+                  href="/reservations"
+                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+                >
+                  Reservations
+                </Link>
+                <Link
+                  href="/reservations/new"
+                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+                >
+                  Reserve
+                </Link>
+                <Link
                   href="/profile"
                   className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
                 >
