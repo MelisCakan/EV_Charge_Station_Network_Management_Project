@@ -2,11 +2,15 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { authApi, handleApiError, setAuthToken } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/AuthContext';
+import { handleApiError } from '@/lib/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const { login } = useAuth();
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -16,9 +20,8 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const data = await authApi.login({ email, password });
-      setAuthToken(data.access_token);
-      window.location.href = '/';
+      await login(email, password);
+      router.push('/profile');
     } catch (err) {
       const apiError = handleApiError(err);
       setError(apiError.message);

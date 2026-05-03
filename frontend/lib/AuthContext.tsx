@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authApi, setAuthToken, clearAuthToken, getAuthToken } from '@/lib/api';
+import { authApi, setAuthToken, clearAuthToken, getAuthToken, type ProfilePayload } from '@/lib/api';
 
 interface User {
   id: number;
@@ -17,6 +17,8 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   signup: (email: string, password: string, full_name: string, phone_number?: string) => Promise<void>;
+  updateProfile: (payload: ProfilePayload) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -58,6 +60,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const updateProfile = async (payload: ProfilePayload) => {
+    setIsLoading(true);
+    try {
+      const updatedUser = await authApi.updateProfile(payload);
+      setUser(updatedUser);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    await authApi.deleteAccount();
+    logout();
+  };
+
   const signup = async (email: string, password: string, full_name: string, phone_number?: string) => {
     setIsLoading(true);
     try {
@@ -77,6 +94,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     logout,
     signup,
+    updateProfile,
+    deleteAccount,
     isAuthenticated: !!user,
   };
 
