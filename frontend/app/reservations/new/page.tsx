@@ -5,11 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { stationApi, vehicleApi, reservationApi, handleApiError } from '@/lib/api';
 import { type ChargingStation, type Vehicle, type Charger, type ReservationCreate } from '@/lib/types';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, Clock, Car, CreditCard } from 'lucide-react';
 
 type Step = 'vehicle' | 'datetime' | 'payment' | 'confirmation';
@@ -215,15 +210,20 @@ export default function NewReservationPage() {
   const availableSlots = buildAvailableSlots(charger);
 
   if (!isAuthenticated) {
-    return <div>Please log in to make a reservation.</div>;
+    return (
+      <div className="min-h-screen bg-[#000D0C] text-[#F2F2F0] flex items-center justify-center">
+        <p className="text-lg">Please log in to make a reservation.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-screen bg-[#F2F2F0] py-8">
+    <div className="min-h-screen bg-[#000D0C] text-[#F2F2F0] py-10">
       <div className="max-w-4xl mx-auto px-4">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-[#000D0C]">New Reservation</h1>
-          <p className="text-[#012623] mt-2">Book a charging slot at your preferred station</p>
+          <p className="text-sm uppercase tracking-[0.24em] text-[#70B4A6]">New Reservation</p>
+          <h1 className="mt-3 text-3xl font-semibold text-white">Book a charging slot</h1>
+          <p className="text-[#D9D5D2]/80 mt-2">Reserve a charger at your preferred station</p>
         </div>
 
         {/* Progress Indicator */}
@@ -236,34 +236,34 @@ export default function NewReservationPage() {
           ].map(({ step, label, icon: Icon }, index) => (
             <div key={step} className="flex items-center">
               <div className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                currentStep === step ? 'bg-[#4C736F] text-white' :
-                ['vehicle', 'datetime', 'payment', 'confirmation'].indexOf(currentStep) > index ? 'bg-green-500 text-white' :
-                'bg-gray-200 text-gray-500'
+                currentStep === step ? 'bg-[#4C736F] text-white shadow-[0_0_15px_rgba(76,115,111,0.5)]' :
+                ['vehicle', 'datetime', 'payment', 'confirmation'].indexOf(currentStep) > index ? 'bg-[#2D564F] text-white' :
+                'bg-[#062C24] text-[#70B4A6]'
               }`}>
                 <Icon size={20} />
               </div>
-              <span className={`ml-2 text-sm ${currentStep === step ? 'font-semibold' : ''}`}>{label}</span>
-              {index < 3 && <div className="w-12 h-0.5 bg-gray-300 mx-4" />}
+              <span className={`ml-2 text-sm hidden sm:inline ${currentStep === step ? 'font-semibold text-white' : 'text-[#D9D5D2]/80'}`}>{label}</span>
+              {index < 3 && <div className="w-8 sm:w-12 h-0.5 bg-[#18423b] mx-2 sm:mx-4" />}
             </div>
           ))}
         </div>
 
         {/* Error Display */}
         {error && (
-          <Alert className="mb-6">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <div className="mb-6 rounded-2xl border border-[#D45D5D]/40 bg-[#3F1818]/50 px-4 py-3 text-sm text-[#F2D1D1]">
+            {error}
+          </div>
         )}
 
         {/* Step Content */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Reserve a charger</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="rounded-[28px] border border-[#18423b]/80 bg-[#031712]/95 p-8 shadow-[0_30px_80px_rgba(0,0,0,0.25)]">
+          <div className="mb-6 border-b border-[#18423b]/80 pb-4">
+            <h2 className="text-2xl font-semibold text-white">Reserve a charger</h2>
+          </div>
+          <div>
             {currentStep === 'vehicle' && (
               <div className="space-y-6">
-                <div className="rounded-xl border border-[#13423a] bg-[#031912] p-4 text-[#D9D5D2]">
+                <div className="rounded-2xl border border-[#13423a]/80 bg-[#031912]/95 p-4 text-[#D9D5D2]">
                   <p className="text-sm">Select the vehicle you want to charge.</p>
                 </div>
 
@@ -271,22 +271,22 @@ export default function NewReservationPage() {
                   {vehicles.map((vehicle) => (
                     <div
                       key={vehicle.id}
-                      className={`border rounded-lg p-4 cursor-pointer ${selectedVehicle?.id === vehicle.id ? 'border-[#4C736F] bg-[#E6FFFA]' : 'hover:bg-gray-50'}`}
+                      className={`border rounded-2xl p-4 cursor-pointer transition ${selectedVehicle?.id === vehicle.id ? 'border-[#6BC0A4] bg-[#0F3E32] shadow-[0_0_15px_rgba(107,192,164,0.15)]' : 'border-[#13423a] bg-[#031912] hover:border-[#4C736F] hover:bg-[#062C24]'}`}
                       onClick={() => handleVehicleSelect(vehicle)}
                     >
-                      <h3 className="font-semibold">{vehicle.brand} {vehicle.model}</h3>
-                      <p className="text-sm text-gray-600">Plate: {vehicle.plate_number}</p>
-                      <p className="text-sm text-gray-500">Connector: {vehicle.connector_type}</p>
+                      <h3 className="font-semibold text-white">{vehicle.brand} {vehicle.model}</h3>
+                      <p className="text-sm text-[#D9D5D2]/80 mt-1">Plate: {vehicle.plate_number}</p>
+                      <p className="text-sm text-[#D9D5D2]/80">Connector: {vehicle.connector_type}</p>
                     </div>
                   ))}
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 mt-4">
                   <div>
-                    <Label htmlFor="station">Station</Label>
+                    <label htmlFor="station" className="block text-sm font-medium text-[#D9D5D2]">Station</label>
                     <select
                       id="station"
-                      className="mt-2 block w-full rounded-3xl border border-[#4C736F] bg-[#031B18] px-4 py-3 text-[#F2F2F0] outline-none"
+                      className="mt-2 block w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20"
                       value={station?.id ?? ''}
                       onChange={async (e) => {
                         const selected = stations.find((item) => String(item.id) === e.target.value);
@@ -301,10 +301,10 @@ export default function NewReservationPage() {
                   </div>
 
                   <div>
-                    <Label htmlFor="charger">Charger</Label>
+                    <label htmlFor="charger" className="block text-sm font-medium text-[#D9D5D2]">Charger</label>
                     <select
                       id="charger"
-                      className="mt-2 block w-full rounded-3xl border border-[#4C736F] bg-[#031B18] px-4 py-3 text-[#F2F2F0] outline-none"
+                      className="mt-2 block w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20"
                       value={charger?.id ?? ''}
                       onChange={(e) => {
                         const selected = chargers.find((item) => String(item.id) === e.target.value);
@@ -320,30 +320,31 @@ export default function NewReservationPage() {
                 </div>
 
                 {compatibility && (
-                  <div className={`rounded-xl border p-4 ${compatibility.is_compatible ? 'border-green-200 bg-green-50 text-green-900' : 'border-red-200 bg-red-50 text-red-900'}`}>
+                  <div className={`rounded-xl border p-4 text-sm ${compatibility.is_compatible ? 'border-[#4C736F]/40 bg-[#16382F]/50 text-[#BCE3CD]' : 'border-[#D45D5D]/40 bg-[#3F1818]/50 text-[#F2D1D1]'}`}>
                     {compatibility.message}
                   </div>
                 )}
 
-                <Button
+                <button
+                  type="button"
                   onClick={() => setCurrentStep('datetime')}
                   disabled={!selectedVehicle || !station || !charger || !compatibility?.is_compatible}
-                  className="w-full"
+                  className="w-full rounded-2xl bg-[#4C736F] px-4 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Continue to available slots
-                </Button>
+                </button>
               </div>
             )}
 
             {currentStep === 'datetime' && (
               <div className="space-y-6">
-                <div className="rounded-xl border border-[#13423a] bg-[#031912] p-4 text-[#D9D5D2]">
-                  <p className="text-sm">Station: {station?.name}</p>
-                  <p className="text-sm">Charger: {charger?.charger_code}</p>
+                <div className="rounded-2xl border border-[#13423a]/80 bg-[#031912]/95 p-4 text-[#D9D5D2]">
+                  <p className="text-sm">Station: <span className="text-white">{station?.name}</span></p>
+                  <p className="text-sm mt-1">Charger: <span className="text-white">{charger?.charger_code}</span></p>
                 </div>
 
                 {availableSlots.length === 0 ? (
-                  <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-yellow-900">
+                  <div className="rounded-xl border border-[#D45D5D]/40 bg-[#3F1818]/50 p-4 text-[#F2D1D1]">
                     No available slots found for this charger right now.
                   </div>
                 ) : (
@@ -353,91 +354,99 @@ export default function NewReservationPage() {
                         key={slot.value}
                         type="button"
                         onClick={() => setSelectedSlot(slot.value)}
-                        className={`rounded-3xl border p-4 text-left ${selectedSlot === slot.value ? 'border-[#4C736F] bg-[#E6FFFA]' : 'border-[#CBD5E1] bg-white/90 hover:border-[#4C736F]'}`}
+                        className={`rounded-2xl border p-4 text-left transition ${selectedSlot === slot.value ? 'border-[#6BC0A4] bg-[#0F3E32] shadow-[0_0_15px_rgba(107,192,164,0.15)]' : 'border-[#13423a] bg-[#031912] hover:border-[#4C736F] hover:bg-[#062C24]'}`}
                       >
-                        <p className="text-sm text-[#0F172A]">{formatSlot(slot.value)}</p>
-                        <p className="mt-2 text-xs text-[#475569]">Available</p>
+                        <p className="text-sm font-medium text-white">{formatSlot(slot.value)}</p>
+                        <p className="mt-2 text-xs text-[#D9D5D2]/80">Available</p>
                       </button>
                     ))}
                   </div>
                 )}
 
-                <div className="flex justify-end">
-                  <Button onClick={handleConfirmSlot} disabled={!selectedSlot}>
+                <div className="flex justify-end mt-6">
+                  <button 
+                    onClick={handleConfirmSlot} 
+                    disabled={!selectedSlot}
+                    className="rounded-2xl bg-[#4C736F] px-6 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     Continue to payment
-                  </Button>
+                  </button>
                 </div>
               </div>
             )}
 
             {currentStep === 'payment' && (
               <form onSubmit={handlePaymentSubmit} className="space-y-4">
-                <div className="rounded-xl border border-[#13423a] bg-[#031912] p-4 text-[#D9D5D2]">
-                  <p className="text-sm">Station: {station?.name}</p>
-                  <p className="text-sm">Charger: {charger?.charger_code}</p>
-                  <p className="text-sm">Vehicle: {selectedVehicle?.brand} {selectedVehicle?.model}</p>
-                  <p className="text-sm">Slot: {selectedSlot ? formatSlot(selectedSlot) : 'Not selected'}</p>
+                <div className="rounded-2xl border border-[#13423a]/80 bg-[#031912]/95 p-4 text-[#D9D5D2]">
+                  <p className="text-sm">Station: <span className="text-white">{station?.name}</span></p>
+                  <p className="text-sm mt-1">Charger: <span className="text-white">{charger?.charger_code}</span></p>
+                  <p className="text-sm mt-1">Vehicle: <span className="text-white">{selectedVehicle?.brand} {selectedVehicle?.model}</span></p>
+                  <p className="text-sm mt-1">Slot: <span className="text-white">{selectedSlot ? formatSlot(selectedSlot) : 'Not selected'}</span></p>
                 </div>
 
-                <div>
-                  <Label htmlFor="cardholderName">Cardholder Name</Label>
-                  <Input
+                <div className="mt-6">
+                  <label htmlFor="cardholderName" className="block text-sm font-medium text-[#D9D5D2]">Cardholder Name</label>
+                  <input
                     id="cardholderName"
                     value={paymentData.cardholderName}
                     onChange={(e) => setPaymentData((prev) => ({ ...prev, cardholderName: e.target.value }))}
                     required
+                    className="mt-2 block w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="cardNumber">Card Number</Label>
-                  <Input
+                  <label htmlFor="cardNumber" className="block text-sm font-medium text-[#D9D5D2]">Card Number</label>
+                  <input
                     id="cardNumber"
                     value={paymentData.cardNumber}
                     onChange={(e) => setPaymentData((prev) => ({ ...prev, cardNumber: e.target.value }))}
                     placeholder="1234 5678 9012 3456"
                     required
+                    className="mt-2 block w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20 placeholder:text-[#4C736F]/50"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="expiryDate">Expiry Date</Label>
-                    <Input
+                    <label htmlFor="expiryDate" className="block text-sm font-medium text-[#D9D5D2]">Expiry Date</label>
+                    <input
                       id="expiryDate"
                       value={paymentData.expiryDate}
                       onChange={(e) => setPaymentData((prev) => ({ ...prev, expiryDate: e.target.value }))}
                       placeholder="MM/YY"
                       required
+                      className="mt-2 block w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20 placeholder:text-[#4C736F]/50"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="cvv">CVV</Label>
-                    <Input
+                    <label htmlFor="cvv" className="block text-sm font-medium text-[#D9D5D2]">CVV</label>
+                    <input
                       id="cvv"
                       value={paymentData.cvv}
                       onChange={(e) => setPaymentData((prev) => ({ ...prev, cvv: e.target.value }))}
                       placeholder="123"
                       required
+                      className="mt-2 block w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20 placeholder:text-[#4C736F]/50"
                     />
                   </div>
                 </div>
-                <Button type="submit" disabled={loading} className="w-full">
+                <button type="submit" disabled={loading} className="w-full mt-6 rounded-2xl bg-[#4C736F] px-4 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4] disabled:opacity-50 disabled:cursor-not-allowed">
                   {loading ? 'Processing...' : 'Confirm payment'}
-                </Button>
+                </button>
               </form>
             )}
 
             {currentStep === 'confirmation' && (
-              <div className="text-center space-y-4">
-                <CheckCircle className="mx-auto h-16 w-16 text-green-500" />
-                <h2 className="text-2xl font-bold text-green-600">Reservation complete</h2>
-                <p className="text-gray-600">Your reservation is confirmed. View it on your reservations page.</p>
-                <Button onClick={handleClose} className="mt-6">
+              <div className="text-center space-y-4 py-8">
+                <CheckCircle className="mx-auto h-16 w-16 text-[#6BC0A4]" />
+                <h2 className="text-2xl font-bold text-white">Reservation complete</h2>
+                <p className="text-[#D9D5D2]/80">Your reservation is confirmed. View it on your reservations page.</p>
+                <button onClick={handleClose} className="mt-6 inline-flex h-12 items-center justify-center rounded-2xl bg-[#4C736F] px-6 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4]">
                   Go to reservations
-                </Button>
+                </button>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
