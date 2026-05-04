@@ -17,7 +17,7 @@ const statusStyle: Record<string, CSSProperties> = {
 };
 
 interface StationInfoWindowProps {
-  station: MapStation;
+  station: MapStation & { chargerDetails?: { id: number, code: string, type: string, status: string, closestTime?: string | null }[] };
   distanceKm?: number;
   onClose: () => void;
   showReserve?: boolean;
@@ -25,8 +25,6 @@ interface StationInfoWindowProps {
 }
 
 export function StationInfoWindow({ station, distanceKm, onClose, showReserve = false, reserveUrl }: StationInfoWindowProps) {
-  const statusKey = station.status ?? "";
-
   return (
     <InfoWindow position={station.location} onCloseClick={onClose}>
       <div style={{ minWidth: 200, fontFamily: "sans-serif", padding: "4px 2px" }}>
@@ -34,23 +32,7 @@ export function StationInfoWindow({ station, distanceKm, onClose, showReserve = 
           {station.name}
         </p>
 
-        {station.status && (
-          <span
-            style={{
-              display: "inline-block",
-              padding: "2px 10px",
-              borderRadius: 999,
-              fontSize: 12,
-              fontWeight: 600,
-              marginBottom: 10,
-              ...(statusStyle[statusKey] ?? { background: "#f1f5f9", color: "#475569" }),
-            }}
-          >
-            {statusLabel[statusKey] ?? statusKey}
-          </span>
-        )}
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, color: "#334155" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 13, color: "#334155", marginTop: 8 }}>
           {station.connector_types && station.connector_types.length > 0 && (
             <div>
               <span style={{ fontWeight: 600 }}>Connectors: </span>

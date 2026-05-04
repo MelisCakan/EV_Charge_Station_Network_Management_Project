@@ -10,8 +10,8 @@ const statusColor: Record<string, string> = {
 };
 
 interface StationMarkerProps {
-  station: MapStation;
-  onSelect: (station: MapStation) => void;
+  station: MapStation & { chargerDetails?: any[] };
+  onSelect: (station: MapStation & { chargerDetails?: any[] }) => void;
 }
 
 export function StationMarker({ station, onSelect }: StationMarkerProps) {

@@ -3,33 +3,53 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
-import { stationApi, vehicleApi, reservationApi, handleApiError } from '@/lib/api';
+import { stationApi, vehicleApi, reservationApi, walletApi, handleApiError } from '@/lib/api';
 import { type ChargingStation, type Vehicle, type Charger, type ReservationCreate } from '@/lib/types';
-import { CheckCircle, Clock, Car, CreditCard } from 'lucide-react';
+import { CheckCircle, Clock, Car, Wallet } from 'lucide-react';
 
 type Step = 'vehicle' | 'datetime' | 'payment' | 'confirmation';
 
-function buildAvailableSlots(charger: Charger | null) {
+function buildAvailableSlots(charger: Charger | null, reservations: any[]) {
   if (!charger || charger.status !== 'available') {
     return [];
   }
 
+  const chargerReservations = reservations.filter(
+    (r) => String(r.charger_id) === String(charger.id) && r.status === 'confirmed'
+  );
+
   const now = new Date();
+  const maxDate = new Date(now.getTime() + 24 * 60 * 60 * 1000); // Backend limits to 24 hours
   const slots: Array<{ value: string; label: string }> = [];
-  const times = ['08:00', '10:00', '12:00', '14:00', '16:00'];
 
-  for (let dayOffset = 0; dayOffset < 3; dayOffset += 1) {
-    const slotDate = new Date(now);
-    slotDate.setDate(now.getDate() + dayOffset);
-    const dateString = slotDate.toISOString().slice(0, 10);
+  for (let dayOffset = 0; dayOffset < 2; dayOffset += 1) {
+    for (let hour = 0; hour < 24; hour++) {
+      const candidate = new Date(now);
+      candidate.setDate(now.getDate() + dayOffset);
+      candidate.setHours(hour, 0, 0, 0);
+      
+      // Only allow slots in the future and within the 24 hour limit
+      if (candidate <= now || candidate > maxDate) continue;
 
-    times.forEach((time) => {
-      const [hour, minute] = time.split(':').map(Number);
-      const candidate = new Date(slotDate);
-      candidate.setHours(hour, minute, 0, 0);
-      if (candidate <= now) return;
-      slots.push({ value: `${dateString}T${time}`, label: `${dateString} ${time}` });
-    });
+      const isOccupied = chargerReservations.some((res) => {
+        const start = new Date(res.start_time);
+        const end = new Date(res.end_time);
+        return candidate >= start && candidate < end;
+      });
+
+      if (isOccupied) continue;
+
+      // Use local timezone strings to avoid UTC mismatch
+      const year = candidate.getFullYear();
+      const month = String(candidate.getMonth() + 1).padStart(2, '0');
+      const day = String(candidate.getDate()).padStart(2, '0');
+      const hr = String(candidate.getHours()).padStart(2, '0');
+      
+      const value = `${year}-${month}-${day}T${hr}:00`;
+      const label = `${year}-${month}-${day} ${hr}:00`;
+
+      slots.push({ value, label });
+    }
   }
 
   return slots;
@@ -57,17 +77,14 @@ export default function NewReservationPage() {
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [charger, setCharger] = useState<Charger | null>(null);
   const [selectedSlot, setSelectedSlot] = useState('');
+  const [durationHours, setDurationHours] = useState<number>(1);
+  const [existingReservations, setExistingReservations] = useState<any[]>([]);
   const [compatibility, setCompatibility] = useState<{ is_compatible: boolean; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Payment form state
-  const [paymentData, setPaymentData] = useState({
-    cardNumber: '',
-    expiryDate: '',
-    cvv: '',
-    cardholderName: '',
-  });
+  // Wallet balance state
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
@@ -78,6 +95,14 @@ export default function NewReservationPage() {
 
     loadInitialData();
   }, [isAuthenticated, isLoading, router]);
+
+  useEffect(() => {
+    if (isAuthenticated && currentStep === 'payment') {
+      walletApi.get()
+        .then(res => setWalletBalance(res.balance))
+        .catch(err => setError(handleApiError(err).message));
+    }
+  }, [isAuthenticated, currentStep]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -114,9 +139,10 @@ export default function NewReservationPage() {
   const loadInitialData = async () => {
     try {
       setLoading(true);
-      const [stationsData, vehiclesData] = await Promise.all([stationApi.list(), vehicleApi.list()]);
+      const [stationsData, vehiclesData, reservationsData] = await Promise.all([stationApi.list(), vehicleApi.list(), reservationApi.list()]);
       setStations(stationsData);
       setVehicles(vehiclesData);
+      setExistingReservations(reservationsData);
     } catch (err) {
       setError(handleApiError(err).message);
     } finally {
@@ -182,16 +208,26 @@ export default function NewReservationPage() {
       return;
     }
 
+    const totalCost = charger.pricing_per_kwh * charger.power_output * durationHours;
+
+    if (walletBalance === null || walletBalance < totalCost) {
+      setError("Ah, it looks like your wallet is running a little light. Please top up your balance to proceed with the reservation!");
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      const payload: ReservationCreate = {
+      await walletApi.deduct(totalCost);
+
+      const payload: any = {
         vehicle_id: selectedVehicle.id,
         station_id: station.id,
         charger_id: charger.id,
         start_time: new Date(selectedSlot).toISOString(),
-        duration_minutes: 60,
+        duration_minutes: durationHours * 60,
+        total_cost: totalCost,
       };
 
       await reservationApi.create(payload);
@@ -207,7 +243,24 @@ export default function NewReservationPage() {
     router.push('/reservations');
   };
 
-  const availableSlots = buildAvailableSlots(charger);
+  const availableSlots = buildAvailableSlots(charger, existingReservations);
+
+  useEffect(() => {
+    if (!selectedSlot || !charger) return;
+    const start = new Date(selectedSlot);
+    const chargerReservations = existingReservations.filter(
+      (r) => String(r.charger_id) === String(charger.id) && r.status === 'confirmed'
+    );
+    const twoHoursEnd = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+    const canBookTwoHours = !chargerReservations.some((res) => {
+      const rStart = new Date(res.start_time);
+      return start < new Date(res.end_time) && twoHoursEnd > rStart;
+    });
+
+    if (!canBookTwoHours && durationHours === 2) {
+      setDurationHours(1);
+    }
+  }, [selectedSlot, charger, existingReservations, durationHours]);
 
   if (!isAuthenticated) {
     return (
@@ -231,7 +284,7 @@ export default function NewReservationPage() {
           {[
             { step: 'vehicle', label: 'Vehicle', icon: Car },
             { step: 'datetime', label: 'Time', icon: Clock },
-            { step: 'payment', label: 'Payment', icon: CreditCard },
+            { step: 'payment', label: 'Payment', icon: Wallet },
             { step: 'confirmation', label: 'Done', icon: CheckCircle },
           ].map(({ step, label, icon: Icon }, index) => (
             <div key={step} className="flex items-center">
@@ -348,26 +401,69 @@ export default function NewReservationPage() {
                     No available slots found for this charger right now.
                   </div>
                 ) : (
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {availableSlots.map((slot) => (
-                      <button
-                        key={slot.value}
-                        type="button"
-                        onClick={() => setSelectedSlot(slot.value)}
-                        className={`rounded-2xl border p-4 text-left transition ${selectedSlot === slot.value ? 'border-[#6BC0A4] bg-[#0F3E32] shadow-[0_0_15px_rgba(107,192,164,0.15)]' : 'border-[#13423a] bg-[#031912] hover:border-[#4C736F] hover:bg-[#062C24]'}`}
-                      >
-                        <p className="text-sm font-medium text-white">{formatSlot(slot.value)}</p>
-                        <p className="mt-2 text-xs text-[#D9D5D2]/80">Available</p>
-                      </button>
-                    ))}
+                  <div className="space-y-6">
+                    <div className="grid max-h-96 gap-3 overflow-y-auto pr-2 md:grid-cols-3">
+                      {availableSlots.map((slot) => (
+                        <button
+                          key={slot.value}
+                          type="button"
+                          onClick={() => setSelectedSlot(slot.value)}
+                          className={`rounded-2xl border p-4 text-left transition ${selectedSlot === slot.value ? 'border-[#6BC0A4] bg-[#0F3E32] shadow-[0_0_15px_rgba(107,192,164,0.15)]' : 'border-[#13423a] bg-[#031912] hover:border-[#4C736F] hover:bg-[#062C24]'}`}
+                        >
+                          <p className="text-sm font-medium text-white">{formatSlot(slot.value)}</p>
+                          <p className="mt-2 text-xs text-[#D9D5D2]/80">Available</p>
+                        </button>
+                      ))}
+                    </div>
+
+                    {selectedSlot && (
+                      <div className="border-t border-[#13423a]/80 pt-4">
+                        <label className="mb-3 block text-sm font-medium text-[#D9D5D2]">Duration</label>
+                        <div className="flex gap-4">
+                          {(() => {
+                            if (!charger) return null;
+                            const start = new Date(selectedSlot);
+                            const chargerReservations = existingReservations.filter(
+                              (r) => String(r.charger_id) === String(charger.id) && r.status === 'confirmed'
+                            );
+                            const twoHoursEnd = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+                            const canBookTwoHours = !chargerReservations.some((res) => {
+                              const rStart = new Date(res.start_time);
+                              return start < new Date(res.end_time) && twoHoursEnd > rStart;
+                            });
+                            
+                            const maxHours = canBookTwoHours ? 2 : 1;
+
+                            return [1, 2].map((hours) => (
+                              <button
+                                key={hours}
+                                type="button"
+                                onClick={() => setDurationHours(hours)}
+                                disabled={hours > maxHours}
+                                className={`flex-1 rounded-2xl border px-6 py-3 text-sm font-medium transition sm:flex-none ${hours > maxHours ? 'opacity-50 cursor-not-allowed border-[#13423a] bg-[#031912] text-[#D9D5D2]/50' : durationHours === hours ? 'border-[#6BC0A4] bg-[#0F3E32] text-white shadow-[0_0_15px_rgba(107,192,164,0.15)]' : 'border-[#13423a] bg-[#031912] text-[#D9D5D2] hover:border-[#4C736F] hover:bg-[#062C24]'}`}
+                              >
+                                {hours} Hour{hours > 1 ? 's' : ''}
+                              </button>
+                            ));
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                <div className="flex justify-end mt-6">
+                <div className="mt-6 flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('vehicle')}
+                    className="rounded-2xl border border-[#4C736F] px-6 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#062C24]"
+                  >
+                    Back
+                  </button>
                   <button 
                     onClick={handleConfirmSlot} 
                     disabled={!selectedSlot}
-                    className="rounded-2xl bg-[#4C736F] px-6 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 rounded-2xl bg-[#4C736F] px-6 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4] disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Continue to payment
                   </button>
@@ -378,60 +474,53 @@ export default function NewReservationPage() {
             {currentStep === 'payment' && (
               <form onSubmit={handlePaymentSubmit} className="space-y-4">
                 <div className="rounded-2xl border border-[#13423a]/80 bg-[#031912]/95 p-4 text-[#D9D5D2]">
-                  <p className="text-sm">Station: <span className="text-white">{station?.name}</span></p>
-                  <p className="text-sm mt-1">Charger: <span className="text-white">{charger?.charger_code}</span></p>
-                  <p className="text-sm mt-1">Vehicle: <span className="text-white">{selectedVehicle?.brand} {selectedVehicle?.model}</span></p>
-                  <p className="text-sm mt-1">Slot: <span className="text-white">{selectedSlot ? formatSlot(selectedSlot) : 'Not selected'}</span></p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <p className="text-sm">Station: <span className="text-white">{station?.name}</span></p>
+                      <p className="mt-1 text-sm">Charger: <span className="text-white">{charger?.charger_code} ({charger?.power_output} kW)</span></p>
+                      <p className="mt-1 text-sm">Vehicle: <span className="text-white">{selectedVehicle?.brand} {selectedVehicle?.model}</span></p>
+                      <p className="mt-1 text-sm">Slot: <span className="text-white">{selectedSlot ? formatSlot(selectedSlot) : 'Not selected'}</span></p>
+                      <p className="mt-1 text-sm">Duration: <span className="text-white">{durationHours} Hour{durationHours > 1 ? 's' : ''}</span></p>
+                    </div>
+                    <div className="mt-4 border-t border-[#13423a]/80 pt-4 sm:mt-0 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0 sm:text-right">
+                      <p className="text-sm">Rate: <span className="text-white">₺{charger?.pricing_per_kwh}/kWh</span></p>
+                      <p className="mt-1 text-sm">Estimated power: <span className="text-white">{charger?.power_output} kW/h</span></p>
+                      <p className="mt-1 text-sm">Est. hourly cost: <span className="text-white">₺{charger ? (charger.pricing_per_kwh * charger.power_output).toFixed(2) : '0.00'}</span></p>
+                      <p className="mt-2 text-lg font-semibold text-[#6BC0A4]">
+                        Total: ₺{charger ? (charger.pricing_per_kwh * charger.power_output * durationHours).toFixed(2) : '0.00'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="mt-6">
-                  <label htmlFor="cardholderName" className="block text-sm font-medium text-[#D9D5D2]">Cardholder Name</label>
-                  <input
-                    id="cardholderName"
-                    value={paymentData.cardholderName}
-                    onChange={(e) => setPaymentData((prev) => ({ ...prev, cardholderName: e.target.value }))}
-                    required
-                    className="mt-2 block w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20"
-                  />
+                <div className="mt-6 rounded-2xl border border-[#4C736F] bg-[#0A2E23] p-6 text-center">
+                  <p className="text-sm text-[#D9D5D2]">Current Wallet Balance</p>
+                  <p className="mt-2 text-3xl font-bold text-white">
+                    ₺{walletBalance !== null ? walletBalance.toFixed(2) : '0.00'}
+                  </p>
+                  
+                  {walletBalance !== null && charger !== null && (walletBalance < charger.pricing_per_kwh * charger.power_output * durationHours) && (
+                    <div className="mt-4 rounded-xl bg-[#3F1818]/50 p-3 border border-[#D45D5D]/40">
+                      <p className="text-sm text-[#F2D1D1]">
+                        Ah, it looks like your wallet is running a little light. Please top up your balance to proceed with the reservation!
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label htmlFor="cardNumber" className="block text-sm font-medium text-[#D9D5D2]">Card Number</label>
-                  <input
-                    id="cardNumber"
-                    value={paymentData.cardNumber}
-                    onChange={(e) => setPaymentData((prev) => ({ ...prev, cardNumber: e.target.value }))}
-                    placeholder="1234 5678 9012 3456"
-                    required
-                    className="mt-2 block w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20 placeholder:text-[#4C736F]/50"
-                  />
+                
+                <div className="mt-6 flex gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('datetime')}
+                    disabled={loading}
+                    className="rounded-2xl border border-[#4C736F] px-6 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#062C24]"
+                  >
+                    Back
+                  </button>
+                  <button type="submit" disabled={loading || (walletBalance !== null && charger !== null && walletBalance < charger.pricing_per_kwh * charger.power_output * durationHours)} className="flex-1 rounded-2xl bg-[#4C736F] px-4 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4] disabled:opacity-50 disabled:cursor-not-allowed">
+                    {loading ? 'Processing...' : 'Pay from Wallet'}
+                  </button>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="expiryDate" className="block text-sm font-medium text-[#D9D5D2]">Expiry Date</label>
-                    <input
-                      id="expiryDate"
-                      value={paymentData.expiryDate}
-                      onChange={(e) => setPaymentData((prev) => ({ ...prev, expiryDate: e.target.value }))}
-                      placeholder="MM/YY"
-                      required
-                      className="mt-2 block w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20 placeholder:text-[#4C736F]/50"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="cvv" className="block text-sm font-medium text-[#D9D5D2]">CVV</label>
-                    <input
-                      id="cvv"
-                      value={paymentData.cvv}
-                      onChange={(e) => setPaymentData((prev) => ({ ...prev, cvv: e.target.value }))}
-                      placeholder="123"
-                      required
-                      className="mt-2 block w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20 placeholder:text-[#4C736F]/50"
-                    />
-                  </div>
-                </div>
-                <button type="submit" disabled={loading} className="w-full mt-6 rounded-2xl bg-[#4C736F] px-4 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4] disabled:opacity-50 disabled:cursor-not-allowed">
-                  {loading ? 'Processing...' : 'Confirm payment'}
-                </button>
               </form>
             )}
 

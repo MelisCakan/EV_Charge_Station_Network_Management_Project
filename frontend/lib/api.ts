@@ -365,6 +365,9 @@ export const reservationApi = {
       return response.data;
     } catch (error) {
       if (isNetworkOrNotFoundError(error)) {
+        if (typeof window !== 'undefined') {
+          return JSON.parse(window.localStorage.getItem('mock_reservations') || '[]');
+        }
         return [];
       }
       throw error;
@@ -378,7 +381,7 @@ export const reservationApi = {
       if (isNetworkOrNotFoundError(error)) {
         const start = new Date(payload.start_time);
         const end = new Date(start.getTime() + payload.duration_minutes * 60000);
-        return {
+        const newReservation = {
           id: Math.floor(Math.random() * 100000) + 1000,
           user_id: 1,
           vehicle_id: payload.vehicle_id,
@@ -387,17 +390,161 @@ export const reservationApi = {
           start_time: start.toISOString(),
           end_time: end.toISOString(),
           status: 'confirmed',
-          total_cost: null,
+          total_cost: payload.total_cost || null,
           created_at: new Date().toISOString(),
         };
+
+        if (typeof window !== 'undefined') {
+          const existing = JSON.parse(window.localStorage.getItem('mock_reservations') || '[]');
+          existing.push(newReservation);
+          window.localStorage.setItem('mock_reservations', JSON.stringify(existing));
+        }
+        return newReservation;
       }
       throw error;
     }
   },
   cancel: async (reservationId: number) => {
-    const response = await api.delete(`/reservations/${reservationId}`);
-    return response.data;
+    try {
+      const response = await api.delete(`/reservations/${reservationId}`);
+      return response.data;
+    } catch (error) {
+      if (isNetworkOrNotFoundError(error)) {
+        if (typeof window !== 'undefined') {
+          const existing = JSON.parse(window.localStorage.getItem('mock_reservations') || '[]');
+          const resToCancel = existing.find((res: any) => res.id === reservationId);
+          const updated = existing.filter((res: any) => res.id !== reservationId);
+          window.localStorage.setItem('mock_reservations', JSON.stringify(updated));
+
+          if (resToCancel && resToCancel.total_cost) {
+            const now = new Date();
+            const start = new Date(resToCancel.start_time);
+            const timeUntilStart = (start.getTime() - now.getTime()) / 60000;
+            
+            let refundAmount = 0;
+            if (timeUntilStart >= 30) {
+              refundAmount = resToCancel.total_cost; // 100% refund
+            } else if (timeUntilStart > 0) {
+              refundAmount = resToCancel.total_cost * 0.8; // 80% refund (20% penalty)
+            }
+
+            if (refundAmount > 0) {
+              const currentBalance = Number(window.localStorage.getItem('mock_wallet_balance') || MOCK_WALLET.balance);
+              const newBalance = currentBalance + refundAmount;
+              window.localStorage.setItem('mock_wallet_balance', String(newBalance));
+
+              const txs = JSON.parse(window.localStorage.getItem('mock_wallet_transactions') || '[]');
+              txs.unshift({
+                id: Date.now(),
+                amount: refundAmount,
+                type: 'refund',
+                timestamp: new Date().toISOString(),
+                status: 'completed'
+              });
+              window.localStorage.setItem('mock_wallet_transactions', JSON.stringify(txs));
+            }
+          }
+        }
+        return { message: 'Reservation cancelled successfully' };
+      }
+      throw error;
+    }
   },
+};
+
+const MOCK_WALLET = { balance: 150.0 };
+
+export const walletApi = {
+  get: async () => {
+    try {
+      const response = await api.get('/wallet');
+      return response.data;
+    } catch (error) {
+      if (isNetworkOrNotFoundError(error)) {
+        if (typeof window !== 'undefined') {
+          return { balance: Number(window.localStorage.getItem('mock_wallet_balance') || MOCK_WALLET.balance) };
+        }
+        return MOCK_WALLET;
+      }
+      throw error;
+    }
+  },
+  getTransactions: async () => {
+    try {
+      const response = await api.get('/wallet/transactions');
+      return response.data;
+    } catch (error) {
+      if (isNetworkOrNotFoundError(error)) {
+        if (typeof window !== 'undefined') {
+          return JSON.parse(window.localStorage.getItem('mock_wallet_transactions') || '[]');
+        }
+        return [];
+      }
+      throw error;
+    }
+  },
+  add: async (amount: number) => {
+    try {
+      const response = await api.post('/wallet/add', { amount });
+      return response.data;
+    } catch (error) {
+      if (isNetworkOrNotFoundError(error)) {
+        if (typeof window !== 'undefined') {
+          const current = Number(window.localStorage.getItem('mock_wallet_balance') || MOCK_WALLET.balance);
+          const newBalance = current + amount;
+          window.localStorage.setItem('mock_wallet_balance', String(newBalance));
+
+          const txs = JSON.parse(window.localStorage.getItem('mock_wallet_transactions') || '[]');
+          txs.unshift({
+            id: Date.now(),
+            amount: amount,
+            type: 'topup',
+            timestamp: new Date().toISOString(),
+            status: 'completed'
+          });
+          window.localStorage.setItem('mock_wallet_transactions', JSON.stringify(txs));
+          return { balance: newBalance };
+        }
+        MOCK_WALLET.balance += amount;
+        return MOCK_WALLET;
+      }
+      throw error;
+    }
+  },
+  deduct: async (amount: number) => {
+    try {
+      const response = await api.post('/wallet/deduct', { amount });
+      return response.data;
+    } catch (error) {
+      if (isNetworkOrNotFoundError(error)) {
+        if (typeof window !== 'undefined') {
+          const current = Number(window.localStorage.getItem('mock_wallet_balance') || MOCK_WALLET.balance);
+          if (current < amount) {
+             throw new Error('Insufficient funds. Please add money to your wallet to continue.');
+          }
+          const newBalance = current - amount;
+          window.localStorage.setItem('mock_wallet_balance', String(newBalance));
+
+          const txs = JSON.parse(window.localStorage.getItem('mock_wallet_transactions') || '[]');
+          txs.unshift({
+            id: Date.now(),
+            amount: amount,
+            type: 'charge',
+            timestamp: new Date().toISOString(),
+            status: 'completed'
+          });
+          window.localStorage.setItem('mock_wallet_transactions', JSON.stringify(txs));
+          return { balance: newBalance };
+        }
+        if (MOCK_WALLET.balance < amount) {
+           throw new Error('Insufficient funds. Please add money to your wallet to continue.');
+        }
+        MOCK_WALLET.balance -= amount;
+        return MOCK_WALLET;
+      }
+      throw error;
+    }
+  }
 };
 
 export const handleApiError = (error: unknown): ApiError => normalizeAxiosError(error);

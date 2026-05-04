@@ -5,7 +5,7 @@ import { APIProvider, Map } from "@vis.gl/react-google-maps";
 import { DEFAULT_CENTER, haversineDistance, fetchDrivingDistance } from "@/lib/maps";
 import { useAuth } from '@/lib/AuthContext';
 import { MapCoordinates, MapStation, ChargingStation, Charger } from "@/lib/types";
-import { stationApi, handleApiError } from "@/lib/api";
+import { stationApi, reservationApi, handleApiError } from "@/lib/api";
 import { StationMarker } from "./StationMarker";
 import { FilterPanel, StationStatus } from "./FilterPanel";
 import { StationInfoWindow } from "./StationInfoWindow";
@@ -20,7 +20,7 @@ const powerRanges: Record<PowerFilter, [number, number]> = {
   high: [150, 1000],
 };
 
-const MOCK_STATIONS: MapStation[] = [
+const MOCK_STATIONS: (MapStation & { chargerDetails?: any[] })[] = [
   {
     id: '101',
     name: 'Seaside EV Hub',
@@ -29,6 +29,10 @@ const MOCK_STATIONS: MapStation[] = [
     power_output: 120,
     pricing_per_kwh: 3.5,
     status: 'available',
+    chargerDetails: [
+      { id: 1001, code: 'DC Fast #1', type: 'CCS', status: 'available', closestTime: null },
+      { id: 1002, code: 'AC Slow #2', type: 'Type2', status: 'available', closestTime: null }
+    ]
   },
   {
     id: '102',
@@ -38,6 +42,10 @@ const MOCK_STATIONS: MapStation[] = [
     power_output: 50,
     pricing_per_kwh: 2.8,
     status: 'available',
+    chargerDetails: [
+      { id: 1003, code: 'CHAdeMO Speed', type: 'CHAdeMO', status: 'available', closestTime: null },
+      { id: 1004, code: 'CCS Rapid', type: 'CCS', status: 'occupied', closestTime: new Date(Date.now() + 3600000).toISOString() }
+    ]
   },
   {
     id: '103',
@@ -47,19 +55,90 @@ const MOCK_STATIONS: MapStation[] = [
     power_output: 22,
     pricing_per_kwh: 2.2,
     status: 'occupied',
+    chargerDetails: [
+      { id: 1005, code: 'Type2 Standard', type: 'Type2', status: 'occupied', closestTime: new Date(Date.now() + 7200000).toISOString() }
+    ]
   },
 ];
 
-function toMapStation(station: ChargingStation, chargers: Charger[]): MapStation {
+function getRealTimeStatus(charger: Charger, reservations: any[]): string {
+  if (charger.status === 'offline') return 'offline';
+  
+  const now = new Date();
+  const chargerReservations = reservations.filter(
+    (r) => String(r.charger_id) === String(charger.id) && r.status === 'confirmed'
+  );
+  
+  const isOccupied = chargerReservations.some((res) => {
+    const start = new Date(res.start_time);
+    const end = new Date(res.end_time);
+    return now >= start && now < end;
+  });
+  
+  if (isOccupied || charger.status === 'occupied') return 'occupied';
+  return 'available';
+}
+
+function getClosestAvailableTime(charger: Charger, reservations: any[]): Date | null {
+  if (charger.status === 'offline') return null;
+
+  const chargerReservations = reservations.filter(
+    (r) => String(r.charger_id) === String(charger.id) && r.status === 'confirmed'
+  );
+
+  const now = new Date();
+  const maxDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  for (let dayOffset = 0; dayOffset < 2; dayOffset += 1) {
+    for (let hour = 0; hour < 24; hour++) {
+      const candidate = new Date(now);
+      candidate.setDate(now.getDate() + dayOffset);
+      candidate.setHours(hour, 0, 0, 0);
+
+      if (candidate <= now || candidate > maxDate) continue;
+
+      const isOccupied = chargerReservations.some((res) => {
+        const start = new Date(res.start_time);
+        const end = new Date(res.end_time);
+        return candidate >= start && candidate < end;
+      });
+
+      if (!isOccupied) {
+        return candidate;
+      }
+    }
+  }
+  return null;
+}
+
+function toMapStation(station: ChargingStation, chargers: Charger[], reservations: any[]): MapStation & { chargerDetails: any[] } {
   const connectorTypes = [...new Set(chargers.map(c => c.connector_type))] as Array<'CCS' | 'CHAdeMO' | 'Type2'>;
   const maxPower = chargers.length > 0 ? Math.max(...chargers.map(c => c.power_output)) : undefined;
   const minPrice = chargers.length > 0 ? Math.min(...chargers.map(c => c.pricing_per_kwh)) : undefined;
 
-  const hasAvailable = chargers.some(c => c.status === 'available');
-  const allOffline = chargers.every(c => c.status === 'offline');
-  let status: 'available' | 'occupied' | 'offline' = 'occupied';
-  if (hasAvailable) status = 'available';
-  else if (allOffline || chargers.length === 0) status = 'offline';
+  const chargerDetails = chargers.map(c => {
+    const currentStatus = getRealTimeStatus(c, reservations);
+    const closestTime = getClosestAvailableTime(c, reservations);
+    return {
+      id: c.id,
+      code: c.charger_code,
+      type: c.connector_type,
+      status: currentStatus,
+      closestTime: closestTime ? closestTime.toISOString() : null,
+    };
+  });
+
+  let availableCount = 0;
+  let occupiedCount = 0;
+
+  chargerDetails.forEach((c) => {
+    if (c.status === 'available') availableCount++;
+    else if (c.status === 'occupied') occupiedCount++;
+  });
+
+  let status: 'available' | 'occupied' | 'offline' = 'offline';
+  if (availableCount > 0) status = 'available';
+  else if (occupiedCount > 0) status = 'occupied';
 
   return {
     id: String(station.id),
@@ -69,6 +148,7 @@ function toMapStation(station: ChargingStation, chargers: Charger[]): MapStation
     power_output: maxPower,
     pricing_per_kwh: minPrice,
     status,
+    chargerDetails,
   };
 }
 
@@ -77,26 +157,30 @@ export function MapView() {
   const [mapCenter, setMapCenter] = useState<MapCoordinates>(DEFAULT_CENTER);
   const [userLocation, setUserLocation] = useState<MapCoordinates | null>(null);
   const [distances, setDistances] = useState<Record<string, number>>({});
-  const [selectedStation, setSelectedStation] = useState<MapStation | null>(null);
+  const [selectedStation, setSelectedStation] = useState<(MapStation & { chargerDetails?: any[] }) | null>(null);
   const [selectedConnectors, setSelectedConnectors] = useState<ConnectorType[]>(['CCS', 'CHAdeMO', 'Type2']);
   const [selectedPowerId, setSelectedPowerId] = useState<PowerFilter>('all');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50]);
   const [selectedStatuses, setSelectedStatuses] = useState<StationStatus[]>(['available', 'occupied', 'offline']);
-  const [stations, setStations] = useState<MapStation[]>([]);
+  const [stations, setStations] = useState<(MapStation & { chargerDetails?: any[] })[]>([]);
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
   // Fetch stations from backend API
   useEffect(() => {
     async function fetchStations() {
       try {
-        const stationList = await stationApi.list();
-        const mapStations: MapStation[] = await Promise.all(
+        const [stationList, reservationsList] = await Promise.all([
+          stationApi.list(),
+          reservationApi.list().catch(() => [])
+        ]);
+        
+        const mapStations = await Promise.all(
           stationList.map(async (station) => {
             try {
               const chargers = await stationApi.chargers(String(station.id));
-              return toMapStation(station, chargers);
+              return toMapStation(station, chargers, reservationsList);
             } catch {
-              return toMapStation(station, []);
+              return toMapStation(station, [], reservationsList);
             }
           })
         );

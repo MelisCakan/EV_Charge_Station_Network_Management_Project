@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, BatteryCharging, DollarSign, Wifi, Zap } from 'lucide-react';
 import { ChargingStation, Charger } from '@/lib/types';
-import { stationApi, handleApiError } from '@/lib/api';
+import { stationApi, reservationApi, handleApiError } from '@/lib/api';
 
 const statusStyles: Record<string, string> = {
   available: 'bg-emerald-500/10 text-emerald-300',
@@ -18,36 +18,71 @@ const chargerTypeStyles: Record<string, string> = {
   DC: 'bg-violet-500/10 text-violet-300',
 };
 
-const timeSlotTemplates = [
-  { label: '08:00', value: '08:00' },
-  { label: '10:00', value: '10:00' },
-  { label: '12:00', value: '12:00' },
-  { label: '14:00', value: '14:00' },
-  { label: '16:00', value: '16:00' },
-];
+function getRealTimeStatus(charger: Charger, reservations: any[]): string {
+  if (charger.status === 'offline') return 'offline';
+  
+  const now = new Date();
+  const chargerReservations = reservations.filter(
+    (r) => String(r.charger_id) === String(charger.id) && r.status === 'confirmed'
+  );
+  
+  const isOccupied = chargerReservations.some((res) => {
+    const start = new Date(res.start_time);
+    const end = new Date(res.end_time);
+    return now >= start && now < end;
+  });
+  
+  if (isOccupied || charger.status === 'occupied') return 'occupied';
+  return 'available';
+}
 
-function buildAvailabilityOptions(charger: Charger) {
-  if (charger.status === 'available') {
-    return timeSlotTemplates.map((slot) => ({
-      value: slot.value,
-      label: `${slot.label} — Available`,
-      disabled: false,
-    }));
+function getStationRealTimeStatus(station: ChargingStation, chargers: Charger[], reservations: any[]): string {
+  if (station.status !== 'active') return 'offline';
+  
+  let availableCount = 0;
+  let occupiedCount = 0;
+
+  chargers.forEach((charger) => {
+    const status = getRealTimeStatus(charger, reservations);
+    if (status === 'available') availableCount++;
+    else if (status === 'occupied') occupiedCount++;
+  });
+
+  if (availableCount > 0) return 'available';
+  if (occupiedCount > 0) return 'occupied';
+  return 'offline';
+}
+
+function getClosestAvailableTime(charger: Charger, reservations: any[]): Date | null {
+  if (charger.status === 'offline') return null;
+
+  const chargerReservations = reservations.filter(
+    (r) => String(r.charger_id) === String(charger.id) && r.status === 'confirmed'
+  );
+
+  const now = new Date();
+  const maxDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+  for (let dayOffset = 0; dayOffset < 2; dayOffset += 1) {
+    for (let hour = 0; hour < 24; hour++) {
+      const candidate = new Date(now);
+      candidate.setDate(now.getDate() + dayOffset);
+      candidate.setHours(hour, 0, 0, 0);
+
+      if (candidate <= now || candidate > maxDate) continue;
+
+      const isOccupied = chargerReservations.some((res) => {
+        const start = new Date(res.start_time);
+        const end = new Date(res.end_time);
+        return candidate >= start && candidate < end;
+      });
+
+      if (!isOccupied) {
+        return candidate;
+      }
+    }
   }
-
-  if (charger.status === 'occupied') {
-    return [{
-      value: 'occupied',
-      label: 'Currently occupied',
-      disabled: true,
-    }];
-  }
-
-  return [{
-    value: 'offline',
-    label: 'Offline for maintenance',
-    disabled: true,
-  }];
+  return null;
 }
 
 export default function StationDetailsPage() {
@@ -55,7 +90,7 @@ export default function StationDetailsPage() {
   const stationId = params.id as string;
   const [station, setStation] = useState<ChargingStation | null>(null);
   const [chargers, setChargers] = useState<Charger[]>([]);
-  const [selectedTimeByCharger, setSelectedTimeByCharger] = useState<Record<number, string>>({});
+  const [reservations, setReservations] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,21 +99,14 @@ export default function StationDetailsPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const [stationData, chargersData] = await Promise.all([
+        const [stationData, chargersData, reservationsData] = await Promise.all([
           stationApi.details(stationId),
           stationApi.chargers(stationId),
+          reservationApi.list().catch(() => []), // Ignore auth error
         ]);
         setStation(stationData);
         setChargers(chargersData);
-
-        const initialTimes: Record<number, string> = {};
-        chargersData.forEach((charger) => {
-          const options = buildAvailabilityOptions(charger);
-          if (options.length > 0 && !options[0].disabled) {
-            initialTimes[charger.id] = options[0].value;
-          }
-        });
-        setSelectedTimeByCharger(initialTimes);
+        setReservations(reservationsData);
       } catch (err) {
         const apiErr = handleApiError(err);
         setError(apiErr.message);
@@ -110,6 +138,8 @@ export default function StationDetailsPage() {
     );
   }
 
+  const stationRealTimeStatus = getStationRealTimeStatus(station, chargers, reservations);
+
   return (
     <div className="min-h-screen bg-[#000D0C] text-[#F2F2F0]">
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -140,8 +170,8 @@ export default function StationDetailsPage() {
                 {chargers.length} chargers
               </div>
               <div className="inline-flex items-center gap-2 rounded-2xl border border-[#4C736F] bg-[#062C24] px-4 py-2 text-sm text-[#D9D5D2]">
-                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${station.status === 'active' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-red-500/10 text-red-300'}`}>
-                  {station.status}
+                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize ${statusStyles[stationRealTimeStatus] || ''}`}>
+                  {stationRealTimeStatus}
                 </span>
               </div>
             </div>
@@ -149,9 +179,17 @@ export default function StationDetailsPage() {
 
           <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {chargers.map((charger) => {
-              const availabilityOptions = buildAvailabilityOptions(charger);
-              const selectedTime = selectedTimeByCharger[charger.id] ?? availabilityOptions[0]?.value;
-              const reserveHref = `/reservations/new?station=${station.id}&charger=${charger.id}${selectedTime ? `&datetime=${encodeURIComponent(`${new Date().toISOString().slice(0, 10)}T${selectedTime}`)}` : ''}`;
+              const currentStatus = getRealTimeStatus(charger, reservations);
+              const closestTime = getClosestAvailableTime(charger, reservations);
+              
+              let reserveHref = `/reservations/new?station=${station.id}&charger=${charger.id}`;
+              if (closestTime) {
+                const year = closestTime.getFullYear();
+                const month = String(closestTime.getMonth() + 1).padStart(2, '0');
+                const day = String(closestTime.getDate()).padStart(2, '0');
+                const hr = String(closestTime.getHours()).padStart(2, '0');
+                reserveHref += `&datetime=${encodeURIComponent(`${year}-${month}-${day}T${hr}:00`)}`;
+              }
 
               return (
                 <div
@@ -189,33 +227,40 @@ export default function StationDetailsPage() {
                       <Wifi className="h-4 w-4 text-[#6BC0A4]" />
                       <div>
                         <p className="text-sm text-[#D9D5D2]">Status</p>
-                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusStyles[charger.status] || ''}`}>
-                          {charger.status}
+                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold capitalize ${statusStyles[currentStatus] || ''}`}>
+                          {currentStatus}
                         </span>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-6 space-y-3">
-                    <label className="block text-sm text-[#D9D5D2]">Availability</label>
-                    <select
-                      value={selectedTime}
-                      onChange={(event) => setSelectedTimeByCharger((prev) => ({ ...prev, [charger.id]: event.target.value }))}
-                      className="w-full rounded-3xl border border-[#4C736F] bg-[#02110F] px-4 py-3 text-[#F2F2F0] outline-none transition focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/30"
-                    >
-                      {availabilityOptions.map((option) => (
-                        <option key={option.value} value={option.value} disabled={option.disabled}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <a
-                      href={reserveHref}
-                      className={`inline-flex w-full items-center justify-center rounded-3xl px-4 py-3 text-sm font-semibold transition ${charger.status === 'available' ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'cursor-not-allowed bg-[#334155] text-[#94A3B8]'}`}
-                      aria-disabled={charger.status !== 'available'}
-                    >
-                      Reserve this charger
-                    </a>
+                    {currentStatus !== 'offline' ? (
+                      closestTime ? (
+                        <>
+                          <p className="text-sm text-[#D9D5D2] text-center mb-2">
+                            Closest available time: <span className="font-semibold text-white">{closestTime.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </p>
+                          <Link
+                            href={reserveHref}
+                            className="inline-flex w-full items-center justify-center rounded-3xl bg-[#2563EB] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1D4ED8]"
+                          >
+                            Reserve this charger
+                          </Link>
+                        </>
+                      ) : (
+                        <p className="text-sm text-red-400 text-center py-2">
+                          No available slots in the next 24 hours.
+                        </p>
+                      )
+                    ) : (
+                      <button
+                        disabled
+                        className="inline-flex w-full items-center justify-center rounded-3xl bg-[#334155] px-4 py-3 text-sm font-semibold text-[#94A3B8] cursor-not-allowed"
+                      >
+                        Offline for maintenance
+                      </button>
+                    )}
                   </div>
                 </div>
               );

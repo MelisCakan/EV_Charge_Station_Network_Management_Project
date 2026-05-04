@@ -133,6 +133,9 @@ export default function ProfilePage() {
             <Button variant="ghost" className="text-[#D9D5D2] hover:text-[#F2F2F0]" onClick={() => router.push('/vehicles')}>
               Manage Vehicles
             </Button>
+            <Button variant="ghost" className="text-[#D9D5D2] hover:text-[#F2F2F0]" onClick={() => router.push('/wallet')}>
+              My Wallet
+            </Button>
             <Button variant="ghost" className="text-[#D9D5D2] hover:text-[#F2F2F0]" onClick={handleLogout}>
               Logout
             </Button>
