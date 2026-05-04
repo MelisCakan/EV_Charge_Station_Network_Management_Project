@@ -2,13 +2,17 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { authApi, handleApiError, setAuthToken } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/AuthContext';
+import { handleApiError } from '@/lib/api';
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const { signup } = useAuth();
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -18,10 +22,8 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      await authApi.register({ email, password, full_name: fullName, phone_number: phone || undefined });
-      const loginData = await authApi.login({ email, password });
-      setAuthToken(loginData.access_token);
-      window.location.href = '/';
+      await signup(email, password, fullName, phone || undefined);
+      router.push('/profile');
     } catch (err) {
       const apiError = handleApiError(err);
       setError(apiError.message);

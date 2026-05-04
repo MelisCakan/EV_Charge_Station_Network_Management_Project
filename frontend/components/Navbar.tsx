@@ -39,14 +39,28 @@ export function Navbar() {
             >
               Map
             </Link>
-            {isAuthenticated && (
-              <Link
-                href="/vehicles"
-                className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-              >
-                My Vehicles
-              </Link>
-            )}
+            {isAuthenticated ? (
+              <>
+                <Link
+                  href="/reservations"
+                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+                >
+                  Reservations
+                </Link>
+                <Link
+                  href="/profile"
+                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+                >
+                  Profile
+                </Link>
+                <Link
+                  href="/vehicles"
+                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+                >
+                  My Vehicles
+                </Link>
+              </>
+            ) : null}
           </div>
 
           {/* Auth Buttons */}

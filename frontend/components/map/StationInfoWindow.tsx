@@ -20,9 +20,11 @@ interface StationInfoWindowProps {
   station: MapStation;
   distanceKm?: number;
   onClose: () => void;
+  showReserve?: boolean;
+  reserveUrl?: string;
 }
 
-export function StationInfoWindow({ station, distanceKm, onClose }: StationInfoWindowProps) {
+export function StationInfoWindow({ station, distanceKm, onClose, showReserve = false, reserveUrl }: StationInfoWindowProps) {
   const statusKey = station.status ?? "";
 
   return (
@@ -88,23 +90,44 @@ export function StationInfoWindow({ station, distanceKm, onClose }: StationInfoW
           </div>
         )}
 
-        <a
-          href={`/stations/${station.id}`}
-          style={{
-            display: "block",
-            marginTop: 10,
-            padding: "6px 12px",
-            borderRadius: 8,
-            background: "#0B3E34",
-            color: "#F2F2F0",
-            fontSize: 13,
-            fontWeight: 600,
-            textAlign: "center",
-            textDecoration: "none",
-          }}
-        >
-          View Details
-        </a>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+          <a
+            href={`/stations/${station.id}`}
+            style={{
+              flex: 1,
+              display: "block",
+              padding: "6px 12px",
+              borderRadius: 8,
+              background: "#0B3E34",
+              color: "#F2F2F0",
+              fontSize: 13,
+              fontWeight: 600,
+              textAlign: "center",
+              textDecoration: "none",
+            }}
+          >
+            View Details
+          </a>
+          {showReserve && reserveUrl && (
+            <a
+              href={reserveUrl}
+              style={{
+                flex: 1,
+                display: "block",
+                padding: "6px 12px",
+                borderRadius: 8,
+                background: "#2563EB",
+                color: "#F2F2F0",
+                fontSize: 13,
+                fontWeight: 600,
+                textAlign: "center",
+                textDecoration: "none",
+              }}
+            >
+              Reserve Here
+            </a>
+          )}
+        </div>
       </div>
     </InfoWindow>
   );
