@@ -7,6 +7,9 @@ from app.models.reservation import Reservation
 from app.models.charger import Charger
 from app.models.vehicle import Vehicle
 from app.models.digital_receipt import DigitalReceipt
+from app.services.wallet_service import WalletService
+from app.services.notification_service import NotificationService
+from app.repositories.wallet_repository import WalletRepository, TransactionRepository
 
 
 class SessionService:
@@ -271,7 +274,35 @@ class SessionService:
             unit_price=charger.pricing_per_kwh,
         )
         db.add(receipt)
-
         db.commit()
+
+        # REQ 4.4: Sarj tamamlaninca otomatik cuzdan kesintisi
+        if total_cost > 0:
+            wallet_service = WalletService(
+                WalletRepository(db),
+                TransactionRepository(db),
+            )
+            wallet_service.deduct(
+                user_id=user_id,
+                amount=round(total_cost, 2),
+                session_id=cs.id,
+            )
+
+        # Bildirim gonder
+        if auto:
+            # REQ 1.9 amendment: Otomatik tamamlama bildirimi
+            NotificationService.send_auto_complete(
+                user_id=user_id,
+                session_id=cs.id,
+                db=db,
+            )
+        else:
+            NotificationService.send_charging_complete(
+                user_id=user_id,
+                session_id=cs.id,
+                total_cost=round(total_cost, 2),
+                db=db,
+            )
+
         db.refresh(cs)
         return cs
