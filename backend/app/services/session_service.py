@@ -274,9 +274,10 @@ class SessionService:
             unit_price=charger.pricing_per_kwh,
         )
         db.add(receipt)
-        db.commit()
 
         # REQ 4.4: Sarj tamamlaninca otomatik cuzdan kesintisi
+        # Onemli: Deduct, commit'ten ONCE yapilir — yetersiz bakiyede
+        # session/receipt commit edilmez, veri butunlugu korunur.
         if total_cost > 0:
             wallet_service = WalletService(
                 WalletRepository(db),
@@ -287,6 +288,8 @@ class SessionService:
                 amount=round(total_cost, 2),
                 session_id=cs.id,
             )
+        else:
+            db.commit()
 
         # Bildirim gonder
         if auto:
