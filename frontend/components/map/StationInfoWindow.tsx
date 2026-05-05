@@ -2,7 +2,7 @@
 
 import { CSSProperties } from "react";
 import { InfoWindow } from "@vis.gl/react-google-maps";
-import { MapStation } from "@/lib/types";
+import { MapStation, Charger } from "@/lib/types";
 
 const statusLabel: Record<string, string> = {
   available: "Available",
@@ -18,18 +18,19 @@ const statusStyle: Record<string, CSSProperties> = {
 
 interface StationInfoWindowProps {
   station: MapStation;
+  chargers?: Charger[];
   distanceKm?: number;
   onClose: () => void;
   showReserve?: boolean;
   reserveUrl?: string;
 }
 
-export function StationInfoWindow({ station, distanceKm, onClose, showReserve = false, reserveUrl }: StationInfoWindowProps) {
+export function StationInfoWindow({ station, chargers = [], distanceKm, onClose, showReserve = false, reserveUrl }: StationInfoWindowProps) {
   const statusKey = station.status ?? "";
 
   return (
     <InfoWindow position={station.location} onCloseClick={onClose}>
-      <div style={{ minWidth: 200, fontFamily: "sans-serif", padding: "4px 2px" }}>
+      <div style={{ minWidth: 220, fontFamily: "sans-serif", padding: "4px 2px" }}>
         <p style={{ margin: "0 0 8px", fontSize: 15, fontWeight: 700, color: "#0f172a" }}>
           {station.name}
         </p>
@@ -66,10 +67,35 @@ export function StationInfoWindow({ station, distanceKm, onClose, showReserve = 
           {station.pricing_per_kwh != null && (
             <div>
               <span style={{ fontWeight: 600 }}>Price: </span>
-              ₺{station.pricing_per_kwh.toFixed(2)} / kWh
+              {station.pricing_per_kwh.toFixed(2)} TL/kWh
             </div>
           )}
         </div>
+
+        {/* Charger Status List */}
+        {chargers.length > 0 && (
+          <div style={{ marginTop: 10, paddingTop: 8, borderTop: "1px solid #e2e8f0" }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: "#0f172a", marginBottom: 6 }}>Chargers</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {chargers.map((c) => (
+                <div key={c.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12 }}>
+                  <span style={{ color: "#334155" }}>{c.charger_code} ({c.connector_type})</span>
+                  <span
+                    style={{
+                      padding: "1px 8px",
+                      borderRadius: 999,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      ...(statusStyle[c.status] ?? { background: "#f1f5f9", color: "#475569" }),
+                    }}
+                  >
+                    {statusLabel[c.status] ?? c.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {distanceKm != null && (
           <div
@@ -86,7 +112,7 @@ export function StationInfoWindow({ station, distanceKm, onClose, showReserve = 
             }}
           >
             <span style={{ fontSize: 15 }}>📍</span>
-            {distanceKm.toFixed(1)} km uzakta
+            {distanceKm.toFixed(1)} km away
           </div>
         )}
 

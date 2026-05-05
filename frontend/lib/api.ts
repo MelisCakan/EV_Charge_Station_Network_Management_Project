@@ -1,7 +1,7 @@
 'use client';
 
 import axios, { AxiosError, AxiosInstance } from 'axios';
-import { Charger, ChargingStation, Vehicle } from './types';
+import { Charger, ChargingStation, ChargingSession, Vehicle, Wallet, Transaction } from './types';
 
 export interface ApiError {
   message: string;
@@ -396,6 +396,50 @@ export const reservationApi = {
   },
   cancel: async (reservationId: number) => {
     const response = await api.delete(`/reservations/${reservationId}`);
+    return response.data;
+  },
+};
+
+// ─── Wallet API ───
+export const walletApi = {
+  balance: async () => {
+    const response = await api.get<Wallet>('/wallet/balance');
+    return response.data;
+  },
+  topup: async (amount: number) => {
+    const response = await api.post<Wallet>('/wallet/topup', { amount });
+    return response.data;
+  },
+  transactions: async () => {
+    const response = await api.get<Transaction[]>('/wallet/transactions');
+    return response.data;
+  },
+};
+
+// ─── Session API ───
+export const sessionApi = {
+  start: async (payload: { reservation_id: number; start_battery_level: number; charger_qr_code: number }) => {
+    const response = await api.post<ChargingSession>('/sessions/start', payload);
+    return response.data;
+  },
+  progress: async (sessionId: number) => {
+    const response = await api.get(`/sessions/${sessionId}/progress`);
+    return response.data;
+  },
+  complete: async (sessionId: number, end_battery_level: number) => {
+    const response = await api.post<ChargingSession>(`/sessions/${sessionId}/complete`, { end_battery_level });
+    return response.data;
+  },
+};
+
+// ─── Receipt API ───
+export const receiptApi = {
+  list: async () => {
+    const response = await api.get('/sessions/receipts/my');
+    return response.data;
+  },
+  detail: async (receiptId: number) => {
+    const response = await api.get(`/sessions/receipts/${receiptId}`);
     return response.data;
   },
 };

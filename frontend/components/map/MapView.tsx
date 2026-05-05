@@ -83,6 +83,7 @@ export function MapView() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 50]);
   const [selectedStatuses, setSelectedStatuses] = useState<StationStatus[]>(['available', 'occupied', 'offline']);
   const [stations, setStations] = useState<MapStation[]>([]);
+  const [stationChargers, setStationChargers] = useState<Record<string, Charger[]>>({});
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
   // Fetch stations from backend API
@@ -90,16 +91,20 @@ export function MapView() {
     async function fetchStations() {
       try {
         const stationList = await stationApi.list();
+        const chargersMap: Record<string, Charger[]> = {};
         const mapStations: MapStation[] = await Promise.all(
           stationList.map(async (station) => {
             try {
               const chargers = await stationApi.chargers(String(station.id));
+              chargersMap[String(station.id)] = chargers;
               return toMapStation(station, chargers);
             } catch {
+              chargersMap[String(station.id)] = [];
               return toMapStation(station, []);
             }
           })
         );
+        setStationChargers(chargersMap);
         if (mapStations.length === 0) {
           setStations(MOCK_STATIONS);
         } else {
@@ -261,6 +266,7 @@ export function MapView() {
             {selectedStation && (
               <StationInfoWindow
                 station={selectedStation}
+                chargers={stationChargers[selectedStation.id] ?? []}
                 distanceKm={distances[selectedStation.id]}
                 onClose={() => setSelectedStation(null)}
                 showReserve={isAuthenticated}

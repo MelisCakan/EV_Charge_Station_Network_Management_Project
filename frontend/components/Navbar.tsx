@@ -54,6 +54,12 @@ export function Navbar() {
                   Profile
                 </Link>
                 <Link
+                  href="/wallet"
+                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+                >
+                  Wallet
+                </Link>
+                <Link
                   href="/vehicles"
                   className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
                 >
