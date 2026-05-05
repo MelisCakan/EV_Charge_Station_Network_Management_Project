@@ -83,10 +83,14 @@ const getStoredToken = () => {
 
 const isNetworkOrNotFoundError = (error: unknown) => {
   if (axios.isAxiosError(error)) {
-    return !error.response || error.response.status === 404;
+    // No response = network error, CORS, connection refused
+    if (!error.response) return true;
+    // 404 or 5xx server errors
+    return error.response.status === 404 || error.response.status >= 500;
   }
   if (typeof error === 'object' && error !== null && 'status' in error) {
-    return (error as ApiError).status === 404;
+    const status = (error as ApiError).status;
+    return status === 404 || (status != null && status >= 500);
   }
   return false;
 };
@@ -341,6 +345,18 @@ export const stationApi = {
       if (isNetworkOrNotFoundError(error)) {
         const mock = MOCK_STATIONS.find((station) => String(station.id) === stationId);
         if (mock) return mock;
+        // Station not in mock data — return a placeholder so page doesn't crash
+        return {
+          id: Number(stationId),
+          name: `Station ${stationId}`,
+          latitude: 0,
+          longitude: 0,
+          address: 'N/A',
+          city: null,
+          operating_hours: 'N/A',
+          status: 'active' as const,
+          created_at: new Date().toISOString(),
+        };
       }
       throw error;
     }
