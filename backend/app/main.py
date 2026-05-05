@@ -9,6 +9,7 @@ from app.routers.session_router import router as session_router
 from app.routers.wallet_router import router as wallet_router
 from app.routers.issue_router import router as issue_router
 from app.routers.admin_router import router as admin_router
+from app.routers.notification_router import router as notification_router
 
 app = FastAPI(
     title="EV Charging Station Network Management API",
@@ -32,6 +33,7 @@ app.include_router(session_router)
 app.include_router(wallet_router)
 app.include_router(issue_router)
 app.include_router(admin_router)
+app.include_router(notification_router)
 
 
 @app.on_event("startup")

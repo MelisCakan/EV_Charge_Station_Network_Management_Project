@@ -65,6 +65,18 @@ export function Navbar() {
                 >
                   My Vehicles
                 </Link>
+                <Link
+                  href="/history"
+                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+                >
+                  History
+                </Link>
+                <Link
+                  href="/notifications"
+                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+                >
+                  Notifications
+                </Link>
               </>
             ) : null}
           </div>
