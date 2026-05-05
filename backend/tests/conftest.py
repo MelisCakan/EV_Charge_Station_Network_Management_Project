@@ -17,6 +17,8 @@ from app.models.charging_session import ChargingSession
 from app.models.wallet import Wallet, Transaction
 from app.models.notification import Notification
 from app.models.digital_receipt import DigitalReceipt
+from app.models.issue_report import IssueReport
+from app.models.maintenance_note import MaintenanceNote
 
 
 # ─── Engine & Session ───
@@ -279,3 +281,85 @@ def test_wallet_low(session, test_user):
     session.commit()
     session.refresh(wallet)
     return wallet
+
+
+# ─── Operator User (UC3 icin) ───
+
+@pytest.fixture
+def test_operator(session):
+    user = User(
+        email="operator@test.com",
+        password_hash="hashedpw789",
+        full_name="Test Operator",
+        phone_number="5550001111",
+        role="operator",
+    )
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+# ─── Wallet for user_2 (TC-13 icin) ───
+
+@pytest.fixture
+def test_wallet_user2(session, test_user_2):
+    wallet = Wallet(
+        user_id=test_user_2.id,
+        balance=300.0,
+    )
+    session.add(wallet)
+    session.commit()
+    session.refresh(wallet)
+    return wallet
+
+
+# ─── Future Reservation (TC-13: gelecek tarihli confirmed) ───
+
+@pytest.fixture
+def test_future_reservation(session, test_user, test_vehicle_ccs, test_station, test_charger_ccs):
+    future = datetime.utcnow() + timedelta(hours=2)
+    reservation = Reservation(
+        user_id=test_user.id,
+        vehicle_id=test_vehicle_ccs.id,
+        station_id=test_station.id,
+        charger_id=test_charger_ccs.id,
+        start_time=future,
+        end_time=future + timedelta(hours=1),
+        status="confirmed",
+    )
+    session.add(reservation)
+    session.commit()
+    session.refresh(reservation)
+    return reservation
+
+
+@pytest.fixture
+def test_future_reservation_user2(session, test_user_2, test_station, test_charger_ccs):
+    """Ayni charger'da ikinci kullanicinin gelecek tarihli reservation'i."""
+    vehicle = Vehicle(
+        user_id=test_user_2.id,
+        brand="Hyundai",
+        model="Ioniq 5",
+        battery_capacity=72.0,
+        connector_type="CCS",
+        plate_number="34XYZ999",
+    )
+    session.add(vehicle)
+    session.commit()
+    session.refresh(vehicle)
+
+    future = datetime.utcnow() + timedelta(hours=4)
+    reservation = Reservation(
+        user_id=test_user_2.id,
+        vehicle_id=vehicle.id,
+        station_id=test_station.id,
+        charger_id=test_charger_ccs.id,
+        start_time=future,
+        end_time=future + timedelta(hours=1),
+        status="confirmed",
+    )
+    session.add(reservation)
+    session.commit()
+    session.refresh(reservation)
+    return reservation
