@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { APIProvider, Map } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, AdvancedMarker } from "@vis.gl/react-google-maps";
+import { LocateFixed } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { DEFAULT_CENTER, haversineDistance, fetchDrivingDistance } from "@/lib/maps";
 import { useAuth } from '@/lib/AuthContext';
 import { MapCoordinates, MapStation, ChargingStation, Charger } from "@/lib/types";
@@ -9,6 +11,8 @@ import { stationApi, handleApiError } from "@/lib/api";
 import { StationMarker } from "./StationMarker";
 import { FilterPanel, StationStatus } from "./FilterPanel";
 import { StationInfoWindow } from "./StationInfoWindow";
+import { RouteDisplay } from "./RouteDisplay";
+import { ReservationModal } from "./ReservationModal";
 
 type ConnectorType = 'CCS' | 'CHAdeMO' | 'Type2';
 type PowerFilter = 'all' | 'low' | 'medium' | 'high';
@@ -84,6 +88,11 @@ export function MapView() {
   const [selectedStatuses, setSelectedStatuses] = useState<StationStatus[]>(['available', 'occupied', 'offline']);
   const [stations, setStations] = useState<MapStation[]>([]);
   const [stationChargers, setStationChargers] = useState<Record<string, Charger[]>>({});
+  const [activeRoute, setActiveRoute] = useState<{
+    origin: MapCoordinates;
+    destination: MapCoordinates;
+  } | null>(null);
+  const [modalStation, setModalStation] = useState<MapStation | null>(null);
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
   // Fetch stations from backend API
@@ -191,8 +200,8 @@ export function MapView() {
         selectedStatuses.length === 0
           ? false
           : station.status
-          ? selectedStatuses.includes(station.status as StationStatus)
-          : true;
+            ? selectedStatuses.includes(station.status as StationStatus)
+            : true;
 
       return connectorMatch && powerMatch && priceMatch && statusMatch;
     });
@@ -220,6 +229,17 @@ export function MapView() {
     });
   };
 
+  const handleReserveClick = (_destination: MapCoordinates) => {
+    if (selectedStation) setModalStation(selectedStation);
+  };
+
+  const handleReservationSuccess = () => {
+    const destination = modalStation?.location ?? null;
+    setModalStation(null);
+    if (!userLocation || !destination) return;
+    setActiveRoute({ origin: userLocation, destination });
+  };
+
   const handleReset = () => {
     setSelectedConnectors(['CCS', 'CHAdeMO', 'Type2']);
     setSelectedPowerId('all');
@@ -235,47 +255,80 @@ export function MapView() {
   }, [filteredStations, selectedStation]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
-      <FilterPanel
-        selectedConnectors={selectedConnectors}
-        selectedPowerId={selectedPowerId}
-        priceRange={priceRange}
-        selectedStatuses={selectedStatuses}
-        onConnectorChange={handleConnectorChange}
-        onPowerChange={handlePowerChange}
-        onPriceChange={handlePriceChange}
-        onStatusChange={handleStatusChange}
-        onReset={handleReset}
-      />
+    <>
+      <div className="grid gap-6 lg:grid-cols-[320px_1fr]">
+        <FilterPanel
+          selectedConnectors={selectedConnectors}
+          selectedPowerId={selectedPowerId}
+          priceRange={priceRange}
+          selectedStatuses={selectedStatuses}
+          onConnectorChange={handleConnectorChange}
+          onPowerChange={handlePowerChange}
+          onPriceChange={handlePriceChange}
+          onStatusChange={handleStatusChange}
+          onReset={handleReset}
+        />
 
-      <div className="w-full h-full min-h-[500px] rounded-lg overflow-hidden border border-zinc-800">
-        <APIProvider apiKey={apiKey}>
-          <Map
-            defaultZoom={12}
-            center={mapCenter}
-            onCameraChanged={(ev) => setMapCenter(ev.detail.center)}
-            mapId="DEMO_MAP_ID"
+        <div className="relative w-full h-full min-h-[500px] rounded-lg overflow-hidden border border-zinc-800">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="absolute bottom-6 right-2 z-10 rounded-full shadow-md"
+            onClick={() => { if (userLocation) setMapCenter(userLocation); }}
           >
-            {filteredStations.map((station) => (
-              <StationMarker
-                key={station.id}
-                station={station}
-                onSelect={setSelectedStation}
-              />
-            ))}
-            {selectedStation && (
-              <StationInfoWindow
-                station={selectedStation}
-                chargers={stationChargers[selectedStation.id] ?? []}
-                distanceKm={distances[selectedStation.id]}
-                onClose={() => setSelectedStation(null)}
-                showReserve={isAuthenticated}
-                reserveUrl={`/reservations/new?station=${selectedStation.id}`}
-              />
-            )}
-          </Map>
-        </APIProvider>
+            <LocateFixed className="h-4 w-4" />
+          </Button>
+          <APIProvider apiKey={apiKey}>
+            <Map
+              defaultZoom={12}
+              center={mapCenter}
+              onCameraChanged={(ev) => setMapCenter(ev.detail.center)}
+              mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID}
+              mapTypeControl={false}
+              streetViewControl={false}
+              zoomControl={false}
+              disableDefaultUI={true}
+            >
+              {userLocation && (
+                <AdvancedMarker position={userLocation}>
+                  <div className="w-4 h-4 bg-blue-500 rounded-full border-2 border-white shadow-md" />
+                </AdvancedMarker>
+              )}
+              {filteredStations.map((station) => (
+                <StationMarker
+                  key={station.id}
+                  station={station}
+                  onSelect={setSelectedStation}
+                />
+              ))}
+              {selectedStation && (
+                <StationInfoWindow
+                  station={selectedStation}
+                  chargers={stationChargers[selectedStation.id] ?? []}
+                  distanceKm={distances[selectedStation.id]}
+                  onClose={() => setSelectedStation(null)}
+                  showReserve={isAuthenticated && userLocation !== null}
+                  onReserve={handleReserveClick}
+                />
+              )}
+              {activeRoute && (
+                <RouteDisplay
+                  origin={activeRoute.origin}
+                  destination={activeRoute.destination}
+                  onClose={() => setActiveRoute(null)}
+                />
+              )}
+            </Map>
+          </APIProvider>
+        </div>
       </div>
-    </div>
+      {modalStation && (
+        <ReservationModal
+          station={modalStation}
+          onSuccess={handleReservationSuccess}
+          onClose={() => setModalStation(null)}
+        />
+      )}
+    </>
   );
 }

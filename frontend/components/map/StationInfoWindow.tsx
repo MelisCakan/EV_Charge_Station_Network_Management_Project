@@ -2,7 +2,7 @@
 
 import { CSSProperties } from "react";
 import { InfoWindow } from "@vis.gl/react-google-maps";
-import { MapStation, Charger } from "@/lib/types";
+import { MapStation, Charger, MapCoordinates } from "@/lib/types";
 
 const statusLabel: Record<string, string> = {
   available: "Available",
@@ -21,11 +21,13 @@ interface StationInfoWindowProps {
   chargers?: Charger[];
   distanceKm?: number;
   onClose: () => void;
+  /** isAuthenticated'dan geliyor — butonu enable/disable eder */
   showReserve?: boolean;
-  reserveUrl?: string;
+  /** Rezervasyon onaylandığında station.location ile çağrılır */
+  onReserve?: (destination: MapCoordinates) => void;
 }
 
-export function StationInfoWindow({ station, chargers = [], distanceKm, onClose, showReserve = false, reserveUrl }: StationInfoWindowProps) {
+export function StationInfoWindow({ station, chargers = [], distanceKm, onClose, showReserve = false, onReserve }: StationInfoWindowProps) {
   const statusKey = station.status ?? "";
 
   return (
@@ -134,25 +136,25 @@ export function StationInfoWindow({ station, chargers = [], distanceKm, onClose,
           >
             View Details
           </a>
-          {showReserve && reserveUrl && (
-            <a
-              href={reserveUrl}
-              style={{
-                flex: 1,
-                display: "block",
-                padding: "6px 12px",
-                borderRadius: 8,
-                background: "#2563EB",
-                color: "#F2F2F0",
-                fontSize: 13,
-                fontWeight: 600,
-                textAlign: "center",
-                textDecoration: "none",
-              }}
-            >
-              Reserve Here
-            </a>
-          )}
+          <button
+            onClick={() => onReserve?.(station.location)}
+            disabled={!showReserve}
+            title={!showReserve ? "Giriş yapın ve konum iznine izin verin" : undefined}
+            style={{
+              flex: 1,
+              padding: "6px 12px",
+              borderRadius: 8,
+              background: showReserve ? "#2563EB" : "#94a3b8",
+              color: "#F2F2F0",
+              fontSize: 13,
+              fontWeight: 600,
+              border: "none",
+              cursor: showReserve ? "pointer" : "not-allowed",
+              opacity: showReserve ? 1 : 0.6,
+            }}
+          >
+            Rezervasyon Yap
+          </button>
         </div>
       </div>
     </InfoWindow>

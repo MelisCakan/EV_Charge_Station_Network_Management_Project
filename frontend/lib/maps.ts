@@ -20,7 +20,12 @@ export function haversineDistance(a: MapCoordinates, b: MapCoordinates): number 
 }
 
 interface RoutesApiResponse {
-  routes?: Array<{ distanceMeters?: number }>;
+  routes?: Array<{ distanceMeters?: number; duration?: string }>;
+}
+
+export interface RouteInfo {
+  distanceKm: number;
+  durationMinutes: number;
 }
 
 export async function fetchDrivingDistance(
@@ -61,4 +66,44 @@ export async function fetchDrivingDistance(
   if (distanceMeters == null) throw new Error("Routes API: distance not found in response");
 
   return distanceMeters / 1000;
+}
+
+export async function fetchRouteInfo(
+  origin: MapCoordinates,
+  destination: MapCoordinates,
+): Promise<RouteInfo> {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+  if (!apiKey) throw new Error("NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is not set");
+
+  const response = await fetch(
+    "https://routes.googleapis.com/directions/v2:computeRoutes",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": apiKey,
+        "X-Goog-FieldMask": "routes.distanceMeters,routes.duration",
+      },
+      body: JSON.stringify({
+        origin: {
+          location: { latLng: { latitude: origin.lat, longitude: origin.lng } },
+        },
+        destination: {
+          location: { latLng: { latitude: destination.lat, longitude: destination.lng } },
+        },
+        travelMode: "DRIVE",
+      }),
+    },
+  );
+
+  if (!response.ok) throw new Error(`Routes API error: ${response.status}`);
+
+  const data: RoutesApiResponse = await response.json();
+  const route = data.routes?.[0];
+  if (!route) throw new Error("No route found");
+
+  return {
+    distanceKm: (route.distanceMeters ?? 0) / 1000,
+    durationMinutes: Math.ceil(parseInt(route.duration ?? "0") / 60),
+  };
 }
