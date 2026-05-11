@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/AuthContext';
 import { Plus, Edit3, Trash2, X } from 'lucide-react';
 import { Vehicle } from '@/lib/types';
 import { vehicleApi, handleApiError } from '@/lib/api';
@@ -26,6 +28,8 @@ interface FormErrors {
 }
 
 export default function VehiclesPage() {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicle, setSelectedVehicle] = useState<Vehicle | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
@@ -36,8 +40,17 @@ export default function VehiclesPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    fetchVehicles();
-  }, []);
+    if (authLoading) return;
+    if (!isAuthenticated || user?.role !== 'driver') {
+      router.push(user?.role === 'admin' ? '/admin' : user?.role === 'operator' ? '/operator' : '/');
+    }
+  }, [authLoading, isAuthenticated, user, router]);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'driver') {
+      fetchVehicles();
+    }
+  }, [isAuthenticated, user]);
 
   const fetchVehicles = async () => {
     setIsLoading(true);

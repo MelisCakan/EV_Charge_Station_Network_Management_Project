@@ -43,15 +43,30 @@ export interface ProfileResponse {
   role: string;
 }
 
-const MOCK_TOKEN = 'mock-token-demo';
-const MOCK_USER: ProfileResponse = {
-  id: 1,
-  email: 'demo@evcharge.test',
-  full_name: 'Demo Driver',
-  phone_number: '0555 123 4567',
-  role: 'driver',
+const MOCK_USERS: Record<string, ProfileResponse> = {
+  'mock-token-driver': {
+    id: 1,
+    email: 'demo@evcharge.test',
+    full_name: 'Demo Driver',
+    phone_number: '0555 123 4567',
+    role: 'driver',
+  },
+  'mock-token-operator': {
+    id: 2,
+    email: 'operator@evcharge.test',
+    full_name: 'Demo Operator',
+    phone_number: '0555 123 4568',
+    role: 'operator',
+  },
+  'mock-token-admin': {
+    id: 3,
+    email: 'admin@evcharge.test',
+    full_name: 'Demo Admin',
+    phone_number: '0555 123 4569',
+    role: 'admin',
+  }
 };
-const isMockToken = (token: string | null | undefined) => token === MOCK_TOKEN;
+const isMockToken = (token: string | null | undefined) => token ? token.startsWith('mock-token') : false;
 
 const getStoredToken = () => {
   if (typeof window === 'undefined') return null;
@@ -133,27 +148,32 @@ export const apiClient = api;
 
 export const authApi = {
   login: async (payload: AuthPayload) => {
-    if (payload.email === 'demo@evcharge.test' && payload.password === 'demo123') {
-      return { access_token: MOCK_TOKEN, token_type: 'bearer' };
+    if (payload.password === 'demo123') {
+      if (payload.email === 'demo@evcharge.test') return { access_token: 'mock-token-driver', token_type: 'bearer' };
+      if (payload.email === 'operator@evcharge.test') return { access_token: 'mock-token-operator', token_type: 'bearer' };
+      if (payload.email === 'admin@evcharge.test') return { access_token: 'mock-token-admin', token_type: 'bearer' };
     }
     const response = await api.post<LoginResponse>('/auth/login', payload);
     return response.data;
   },
   register: async (payload: SignupPayload) => {
-    if (payload.email === 'demo@evcharge.test') {
+    if (payload.email.includes('evcharge.test')) {
       return { message: 'Mock user registered', user_id: 1 };
     }
     const response = await api.post<RegisterResponse>('/auth/register', payload);
     return response.data;
   },
   me: async () => {
-    if (isMockToken(getStoredToken())) return MOCK_USER;
+    const token = getStoredToken();
+    if (token && MOCK_USERS[token]) return MOCK_USERS[token];
     const response = await api.get('/auth/me');
     return response.data;
   },
   updateProfile: async (payload: ProfilePayload) => {
-    if (isMockToken(getStoredToken())) {
-      return { ...MOCK_USER, ...payload, phone_number: payload.phone_number ?? MOCK_USER.phone_number } as ProfileResponse;
+    const token = getStoredToken();
+    if (token && MOCK_USERS[token]) {
+      MOCK_USERS[token] = { ...MOCK_USERS[token], ...payload, phone_number: payload.phone_number ?? MOCK_USERS[token].phone_number } as ProfileResponse;
+      return MOCK_USERS[token];
     }
     const response = await api.put<ProfileResponse>('/auth/me', payload);
     return response.data;
@@ -166,6 +186,56 @@ export const authApi = {
 };
 
 export type StationPayload = Omit<ChargingStation, 'id' | 'created_at'>;
+
+let mockStations: ChargingStation[] = [
+  {
+    id: 101,
+    name: 'Seaside EV Hub',
+    latitude: 38.4300,
+    longitude: 27.1450,
+    address: 'Kordonboyu, Izmir',
+    city: 'Izmir',
+    operating_hours: '08:00-22:00',
+    status: 'active',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 102,
+    name: 'Downtown Fast Charge',
+    latitude: 38.4220,
+    longitude: 27.1410,
+    address: 'Konak, Izmir',
+    city: 'Izmir',
+    operating_hours: '07:00-23:00',
+    status: 'active',
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 103,
+    name: 'Green Valley Station',
+    latitude: 38.4190,
+    longitude: 27.1500,
+    address: 'Bostanli, Izmir',
+    city: 'Izmir',
+    operating_hours: '09:00-20:00',
+    status: 'active',
+    created_at: new Date().toISOString(),
+  }
+];
+
+let mockChargers: Record<string, Charger[]> = {
+  '101': [
+    { id: 1001, station_id: 101, charger_code: 'DC Fast #1', charger_type: 'DC', power_output: 120, connector_type: 'CCS', pricing_per_kwh: 3.5, status: 'available' },
+    { id: 1002, station_id: 101, charger_code: 'AC Slow #2', charger_type: 'AC', power_output: 22, connector_type: 'Type2', pricing_per_kwh: 2.0, status: 'available' },
+  ],
+  '102': [
+    { id: 1003, station_id: 102, charger_code: 'CHAdeMO Speed', charger_type: 'DC', power_output: 50, connector_type: 'CHAdeMO', pricing_per_kwh: 2.8, status: 'available' },
+    { id: 1004, station_id: 102, charger_code: 'CCS Rapid', charger_type: 'DC', power_output: 50, connector_type: 'CCS', pricing_per_kwh: 2.8, status: 'offline' },
+  ],
+  '103': [
+    { id: 1005, station_id: 103, charger_code: 'Type2 Standard', charger_type: 'AC', power_output: 22, connector_type: 'Type2', pricing_per_kwh: 2.2, status: 'occupied' },
+  ]
+};
 
 let mockVehicles: any[] = [
   {
@@ -219,20 +289,51 @@ export const vehicleApi = {
   },
 };
 
+let mockIssues: any[] = [
+  { id: 1, station_id: 101, charger_id: 1001, description: 'Connector damaged', status: 'open', created_at: new Date().toISOString() },
+  { id: 2, station_id: 102, charger_id: 1003, description: 'Payment terminal broken', status: 'in_progress', created_at: new Date().toISOString() },
+];
+
 export const stationApi = {
   list: async () => {
-    const response = await api.get<ChargingStation[]>('/stations');
-    return response.data;
+    if (isMockToken(getStoredToken())) return mockStations;
+    try {
+      const response = await api.get<ChargingStation[]>('/stations');
+      return response.data;
+    } catch (error) {
+      return mockStations; // Fallback so map works without backend
+    }
   },
   details: async (stationId: string) => {
-    const response = await api.get<ChargingStation>(`/stations/${stationId}`);
-    return response.data;
+    if (isMockToken(getStoredToken())) return mockStations.find(s => String(s.id) === stationId) || mockStations[0];
+    try {
+      const response = await api.get<ChargingStation>(`/stations/${stationId}`);
+      return response.data;
+    } catch (error) {
+      return mockStations.find(s => String(s.id) === stationId) || mockStations[0];
+    }
   },
   chargers: async (stationId: string) => {
-    const response = await api.get<Charger[]>(`/stations/${stationId}/chargers`);
+    if (isMockToken(getStoredToken())) return mockChargers[stationId] || [];
+    try {
+      const response = await api.get<Charger[]>(`/stations/${stationId}/chargers`);
+      return response.data;
+    } catch (error) {
+      return mockChargers[stationId] || [];
+    }
+  },
+  reportIssue: async (payload: { station_id: number; charger_id: number; description: string }) => {
+    if (isMockToken(getStoredToken())) {
+      const issue = { id: Date.now(), ...payload, status: 'open', created_at: new Date().toISOString() };
+      mockIssues.push(issue);
+      return issue;
+    }
+    const response = await api.post('/issues', payload);
     return response.data;
   },
 };
+
+let mockReservations: any[] = [];
 
 export const reservationApi = {
   list: async () => {
@@ -240,8 +341,34 @@ export const reservationApi = {
     const response = await api.get('/reservations');
     return response.data;
   },
+  getForCharger: async (chargerId: number) => {
+    if (isMockToken(getStoredToken())) {
+      return mockReservations.filter((r) => r.charger_id === chargerId && r.status === 'confirmed');
+    }
+    try {
+      const response = await api.get(`/reservations/charger/${chargerId}`);
+      return response.data;
+    } catch (error) {
+      return []; // Fallback gracefully if backend endpoint is unavailable
+    }
+  },
   create: async (payload: any) => {
-    if (isMockToken(getStoredToken())) return { id: Date.now(), ...payload, status: 'confirmed' };
+    if (isMockToken(getStoredToken())) {
+      const token = getStoredToken()!;
+      const user = MOCK_USERS[token];
+      const currentBalance = mockWallets[token] || 0;
+      if (currentBalance < 50) {
+        throw new Error('Insufficient wallet balance. Minimum 50 TL required.');
+      }
+      mockWallets[token] -= 50;
+      if (!mockTransactions[token]) mockTransactions[token] = [];
+      mockTransactions[token].unshift({
+        id: Date.now(), wallet_id: user.id, amount: -50, type: 'charge', status: 'completed', created_at: new Date().toISOString()
+      });
+      const newRes = { id: Date.now(), ...payload, status: 'confirmed', total_cost: 50 };
+      mockReservations.push(newRes);
+      return newRes;
+    }
     const response = await api.post('/reservations', payload);
     return response.data;
   },
@@ -253,37 +380,51 @@ export const reservationApi = {
 };
 
 // ─── Wallet API ───
-let mockWalletBalance = 500.0;
-let mockTransactions: any[] = [
-  {
-    id: 1,
-    wallet_id: 1,
-    amount: 500.0,
-    type: 'topup',
-    status: 'completed',
-    created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-  }
-];
+const mockWallets: Record<string, number> = {
+  'mock-token-driver': 500.0,
+  'mock-token-operator': 0.0,
+  'mock-token-admin': 0.0,
+};
+const mockTransactions: Record<string, any[]> = {
+  'mock-token-driver': [
+    {
+      id: 1,
+      wallet_id: 1,
+      amount: 500.0,
+      type: 'topup',
+      status: 'completed',
+      created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+    }
+  ],
+};
 
 export const walletApi = {
   balance: async () => {
-    if (isMockToken(getStoredToken())) return { id: 1, user_id: 1, balance: mockWalletBalance, created_at: new Date().toISOString() };
+    const token = getStoredToken();
+    if (isMockToken(token)) {
+      const user = MOCK_USERS[token!];
+      return { id: user.id, user_id: user.id, balance: mockWallets[token!] || 0, created_at: new Date().toISOString() };
+    }
     const response = await api.get<Wallet>('/wallet/balance');
     return response.data;
   },
   topup: async (amount: number) => {
-    if (isMockToken(getStoredToken())) {
-      mockWalletBalance += amount;
-      mockTransactions.unshift({
-        id: Date.now(), wallet_id: 1, amount: amount, type: 'topup', status: 'completed', created_at: new Date().toISOString()
+    const token = getStoredToken();
+    if (isMockToken(token)) {
+      const user = MOCK_USERS[token!];
+      mockWallets[token!] = (mockWallets[token!] || 0) + amount;
+      if (!mockTransactions[token!]) mockTransactions[token!] = [];
+      mockTransactions[token!].unshift({
+        id: Date.now(), wallet_id: user.id, amount: amount, type: 'topup', status: 'completed', created_at: new Date().toISOString()
       });
-      return { id: 1, user_id: 1, balance: mockWalletBalance, created_at: new Date().toISOString() };
+      return { id: user.id, user_id: user.id, balance: mockWallets[token!], created_at: new Date().toISOString() };
     }
     const response = await api.post<Wallet>('/wallet/topup', { amount });
     return response.data;
   },
   transactions: async () => {
-    if (isMockToken(getStoredToken())) return [...mockTransactions];
+    const token = getStoredToken();
+    if (isMockToken(token)) return [...(mockTransactions[token!] || [])];
     const response = await api.get<Transaction[]>('/wallet/transactions');
     return response.data;
   },
@@ -320,6 +461,63 @@ export const receiptApi = {
     const response = await api.get(`/sessions/receipts/${receiptId}`);
     return response.data;
   },
+};
+
+export const operatorApi = {
+  getIssues: async () => {
+    if (isMockToken(getStoredToken())) {
+      return mockIssues.filter(i => i.status !== 'resolved');
+    }
+    const response = await api.get('/issues');
+    return response.data;
+  },
+  updateChargerStatus: async (chargerId: number, status: string) => {
+    if (isMockToken(getStoredToken())) {
+      for (const stationId in mockChargers) {
+        const charger = mockChargers[stationId].find(c => c.id === chargerId);
+        if (charger) {
+          charger.status = status as any;
+          if (status === 'offline') {
+            const affectedRes = mockReservations.filter(r => r.charger_id === chargerId && r.status === 'confirmed');
+            affectedRes.forEach(r => {
+              r.status = 'cancelled';
+              const token = Object.keys(MOCK_USERS).find(t => MOCK_USERS[t].id === r.user_id);
+              if (token && r.total_cost) {
+                mockWallets[token] = (mockWallets[token] || 0) + r.total_cost;
+                if (!mockTransactions[token]) mockTransactions[token] = [];
+                mockTransactions[token].unshift({
+                  id: Date.now() + Math.random(), wallet_id: r.user_id, amount: r.total_cost, type: 'refund', status: 'completed', created_at: new Date().toISOString()
+                });
+              }
+            });
+          }
+          return charger;
+        }
+      }
+      return { id: chargerId, status };
+    }
+    const response = await api.put(`/admin/chargers/${chargerId}/status`, { status });
+    return response.data;
+  },
+  resolveIssue: async (issueId: number) => {
+    if (isMockToken(getStoredToken())) {
+      const issue = mockIssues.find(i => i.id === issueId);
+      if (issue) issue.status = 'resolved';
+      return { id: issueId, status: 'resolved' };
+    }
+    const response = await api.put(`/issues/${issueId}/resolve`);
+    return response.data;
+  }
+};
+
+export const adminApi = {
+  getStats: async () => {
+    if (isMockToken(getStoredToken())) {
+      return { total_users: 150, active_sessions: 12, total_revenue: 14500.5 };
+    }
+    const response = await api.get('/admin/stats');
+    return response.data;
+  }
 };
 
 export const handleApiError = (error: unknown): ApiError => normalizeAxiosError(error);

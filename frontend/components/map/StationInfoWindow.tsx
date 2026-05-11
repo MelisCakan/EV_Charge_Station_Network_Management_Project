@@ -136,25 +136,6 @@ export function StationInfoWindow({ station, chargers = [], distanceKm, onClose,
           >
             View Details
           </a>
-          <button
-            onClick={() => onReserve?.(station.location)}
-            disabled={!showReserve}
-            title={!showReserve ? "Giriş yapın ve konum iznine izin verin" : undefined}
-            style={{
-              flex: 1,
-              padding: "6px 12px",
-              borderRadius: 8,
-              background: showReserve ? "#2563EB" : "#94a3b8",
-              color: "#F2F2F0",
-              fontSize: 13,
-              fontWeight: 600,
-              border: "none",
-              cursor: showReserve ? "pointer" : "not-allowed",
-              opacity: showReserve ? 1 : 0.6,
-            }}
-          >
-            Rezervasyon Yap
-          </button>
         </div>
       </div>
     </InfoWindow>

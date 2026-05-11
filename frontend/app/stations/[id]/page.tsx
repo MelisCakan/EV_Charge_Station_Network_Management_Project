@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, BatteryCharging, DollarSign, Wifi, Zap } from 'lucide-react';
+import { ArrowLeft, BatteryCharging, DollarSign, Wifi, Zap, AlertTriangle } from 'lucide-react';
 import { ChargingStation, Charger } from '@/lib/types';
-import { stationApi, handleApiError } from '@/lib/api';
+import { stationApi, reservationApi, handleApiError } from '@/lib/api';
+import { useAuth } from '@/lib/AuthContext';
 
 const statusStyles: Record<string, string> = {
   available: 'bg-emerald-500/10 text-emerald-300',
@@ -18,46 +19,73 @@ const chargerTypeStyles: Record<string, string> = {
   DC: 'bg-violet-500/10 text-violet-300',
 };
 
-const timeSlotTemplates = [
-  { label: '08:00', value: '08:00' },
-  { label: '10:00', value: '10:00' },
-  { label: '12:00', value: '12:00' },
-  { label: '14:00', value: '14:00' },
-  { label: '16:00', value: '16:00' },
-];
-
-function buildAvailabilityOptions(charger: Charger) {
-  if (charger.status === 'available') {
-    return timeSlotTemplates.map((slot) => ({
-      value: slot.value,
-      label: `${slot.label} — Available`,
-      disabled: false,
-    }));
+function buildAvailabilityOptions(charger: Charger, reservations: any[] = []) {
+  if (charger.status === 'offline') {
+    return [{ value: 'offline', label: 'Offline for maintenance', disabled: true }];
   }
 
-  if (charger.status === 'occupied') {
-    return [{
-      value: 'occupied',
-      label: 'Currently occupied',
-      disabled: true,
-    }];
+  const options: Array<{ value: string; label: string; disabled: boolean }> = [];
+  const now = new Date();
+  now.setMinutes(0, 0, 0);
+  now.setHours(now.getHours() + 1);
+
+  const endTime = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+  let currentTime = new Date(now);
+
+  while (currentTime <= endTime) {
+    const slotStart = new Date(currentTime);
+    const slotEnd = new Date(currentTime.getTime() + 60 * 60 * 1000);
+    const isOccupied = reservations.some(r => {
+      const rStart = new Date(r.start_time);
+      const duration = r.duration_minutes || 60;
+      const rEnd = new Date(r.end_time || rStart.getTime() + duration * 60000);
+      return (slotStart < rEnd && slotEnd > rStart);
+    });
+    const dayStr = slotStart.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+    const timeStr = slotStart.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    options.push({ value: slotStart.toISOString(), label: `${dayStr} ${timeStr} — ${isOccupied ? 'Occupied' : 'Available'}`, disabled: isOccupied });
+    currentTime.setHours(currentTime.getHours() + 1);
   }
 
-  return [{
-    value: 'offline',
-    label: 'Offline for maintenance',
-    disabled: true,
-  }];
+  if (options.length === 0) {
+    return [{ value: 'none', label: 'No available slots', disabled: true }];
+  }
+
+  return options;
 }
 
 export default function StationDetailsPage() {
   const params = useParams();
   const stationId = params.id as string;
+  const { user, isAuthenticated } = useAuth();
   const [station, setStation] = useState<ChargingStation | null>(null);
   const [chargers, setChargers] = useState<Charger[]>([]);
+  const [reservationsByCharger, setReservationsByCharger] = useState<Record<number, any[]>>({});
   const [selectedTimeByCharger, setSelectedTimeByCharger] = useState<Record<number, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reportingCharger, setReportingCharger] = useState<number | null>(null);
+  const [issueDescription, setIssueDescription] = useState('');
+  const [isSubmittingIssue, setIsSubmittingIssue] = useState(false);
+
+  const handleReportIssue = async (chargerId: number) => {
+    if (!issueDescription.trim()) return;
+    setIsSubmittingIssue(true);
+    try {
+      await stationApi.reportIssue({
+        station_id: Number(stationId),
+        charger_id: chargerId,
+        description: issueDescription
+      });
+      alert('Issue reported successfully. Operators have been notified.');
+      setReportingCharger(null);
+      setIssueDescription('');
+    } catch (err) {
+      alert('Failed to report issue: ' + handleApiError(err).message);
+    } finally {
+      setIsSubmittingIssue(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -71,9 +99,19 @@ export default function StationDetailsPage() {
         setStation(stationData);
         setChargers(chargersData);
 
+        const resMap: Record<number, any[]> = {};
+        for (const c of chargersData) {
+          try {
+            resMap[c.id] = await reservationApi.getForCharger(c.id);
+          } catch {
+            resMap[c.id] = [];
+          }
+        }
+        setReservationsByCharger(resMap);
+
         const initialTimes: Record<number, string> = {};
         chargersData.forEach((charger) => {
-          const options = buildAvailabilityOptions(charger);
+          const options = buildAvailabilityOptions(charger, resMap[charger.id] || []);
           if (options.length > 0 && !options[0].disabled) {
             initialTimes[charger.id] = options[0].value;
           }
@@ -149,9 +187,9 @@ export default function StationDetailsPage() {
 
           <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
             {chargers.map((charger) => {
-              const availabilityOptions = buildAvailabilityOptions(charger);
+              const availabilityOptions = buildAvailabilityOptions(charger, reservationsByCharger[charger.id] || []);
               const selectedTime = selectedTimeByCharger[charger.id] ?? availabilityOptions[0]?.value;
-              const reserveHref = `/reservations/new?station=${station.id}&charger=${charger.id}${selectedTime ? `&datetime=${encodeURIComponent(`${new Date().toISOString().slice(0, 10)}T${selectedTime}`)}` : ''}`;
+              const reserveHref = `/reservations/new?station=${station.id}&charger=${charger.id}${selectedTime && selectedTime !== 'offline' && selectedTime !== 'none' ? `&datetime=${encodeURIComponent(selectedTime)}` : ''}`;
 
               return (
                 <div
@@ -211,11 +249,49 @@ export default function StationDetailsPage() {
                     </select>
                     <a
                       href={reserveHref}
-                      className={`inline-flex w-full items-center justify-center rounded-3xl px-4 py-3 text-sm font-semibold transition ${charger.status === 'available' ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'cursor-not-allowed bg-[#334155] text-[#94A3B8]'}`}
-                      aria-disabled={charger.status !== 'available'}
+                      className={`inline-flex w-full items-center justify-center rounded-3xl px-4 py-3 text-sm font-semibold transition ${charger.status !== 'offline' ? 'bg-[#2563EB] text-white hover:bg-[#1D4ED8]' : 'cursor-not-allowed bg-[#334155] text-[#94A3B8]'}`}
+                      aria-disabled={charger.status === 'offline'}
                     >
                       Reserve this charger
                     </a>
+
+                    {isAuthenticated && user?.role === 'driver' && (
+                      <button
+                        onClick={() => setReportingCharger(charger.id)}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-3xl border border-[#D45D5D]/40 bg-[#3F1818]/50 px-4 py-3 text-sm font-semibold text-[#F2D1D1] transition hover:bg-[#D45D5D]/20"
+                      >
+                        <AlertTriangle className="h-4 w-4" />
+                        Report an issue
+                      </button>
+                    )}
+
+                    {reportingCharger === charger.id && (
+                      <div className="mt-4 rounded-2xl border border-[#4C736F] bg-[#0A2E23] p-4 shadow-lg">
+                        <label className="block text-xs font-medium text-[#D9D5D2] mb-2">Describe the issue</label>
+                        <textarea
+                          rows={3}
+                          value={issueDescription}
+                          onChange={(e) => setIssueDescription(e.target.value)}
+                          className="w-full rounded-xl border border-[#13423a]/80 bg-[#031912] p-3 text-sm text-white outline-none focus:border-[#6BC0A4]"
+                          placeholder="e.g. Connector is physically damaged..."
+                        />
+                        <div className="mt-3 flex justify-end gap-2">
+                          <button
+                            onClick={() => { setReportingCharger(null); setIssueDescription(''); }}
+                            className="rounded-xl px-4 py-2 text-xs font-medium text-[#A7BEB5] hover:text-white transition"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            onClick={() => handleReportIssue(charger.id)}
+                            disabled={isSubmittingIssue || !issueDescription.trim()}
+                            className="rounded-xl bg-[#6BC0A4] px-4 py-2 text-xs font-semibold text-[#000D0C] hover:bg-[#70B4A6] disabled:opacity-50 transition"
+                          >
+                            {isSubmittingIssue ? 'Submitting...' : 'Submit Report'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               );

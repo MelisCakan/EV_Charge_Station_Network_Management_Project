@@ -1,29 +1,61 @@
 'use client';
 
-import Link from 'next/link';
-import { ArrowLeft, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/AuthContext';
+import { adminApi, handleApiError } from '@/lib/api';
+import { ShieldCheck, Users, Activity, Banknote } from 'lucide-react';
 
-export default function AdminPage() {
+export default function AdminDashboard() {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+  const [stats, setStats] = useState<any>(null);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!isAuthenticated || user?.role !== 'admin') {
+      router.push('/');
+    }
+  }, [isAuthenticated, isLoading, user, router]);
+
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== 'admin') return;
+    adminApi.getStats()
+      .then(setStats)
+      .catch(err => console.error("Failed to load admin stats", handleApiError(err)));
+  }, [isAuthenticated, user]);
+
+  if (isLoading) return <div className="min-h-screen bg-[#000D0C] text-[#F2F2F0] p-10">Loading...</div>;
+
   return (
-    <div className="min-h-screen bg-[#000D0C] text-[#F2F2F0]">
-      <div className="mx-auto max-w-2xl px-4 py-10">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-sm font-medium text-[#70B4A6] transition hover:text-[#6BC0A4]"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to map
-        </Link>
-
-        <div className="mt-16 flex flex-col items-center text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full border border-[#4C736F] bg-[#062C24]">
-            <ShieldCheck className="h-10 w-10 text-[#70B4A6]" />
+    <div className="min-h-screen bg-[#000D0C] text-[#F2F2F0] py-10">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="flex items-center gap-3">
+          <ShieldCheck className="w-8 h-8 text-[#6BC0A4]" />
+          <div>
+            <p className="text-sm uppercase tracking-[0.24em] text-[#70B4A6]">System Overview</p>
+            <h1 className="text-3xl font-semibold text-white">Admin Dashboard</h1>
           </div>
-          <h1 className="mt-6 text-2xl font-semibold text-white">Admin Dashboard</h1>
-          <p className="mt-2 text-sm text-[#A7BEB5]">Revenue, Utilization, Peak Hours</p>
-          <p className="mt-4 max-w-md text-[#A7BEB5]">
-            This function has not been implemented yet.
-          </p>
+        </div>
+
+        <div className="mt-8 grid gap-6 md:grid-cols-3">
+          <div className="rounded-[28px] border border-[#18423b]/80 bg-[#031712]/95 p-6 flex flex-col items-center shadow-lg">
+            <Users className="w-10 h-10 text-blue-400 mb-2" />
+            <p className="text-[#A7BEB5] text-sm">Total Registered Users</p>
+            <p className="text-3xl font-bold text-white mt-1">{stats?.total_users || 0}</p>
+          </div>
+          
+          <div className="rounded-[28px] border border-[#18423b]/80 bg-[#031712]/95 p-6 flex flex-col items-center shadow-lg">
+            <Activity className="w-10 h-10 text-green-400 mb-2" />
+            <p className="text-[#A7BEB5] text-sm">Active Charging Sessions</p>
+            <p className="text-3xl font-bold text-white mt-1">{stats?.active_sessions || 0}</p>
+          </div>
+
+          <div className="rounded-[28px] border border-[#18423b]/80 bg-[#031712]/95 p-6 flex flex-col items-center shadow-lg">
+            <Banknote className="w-10 h-10 text-yellow-400 mb-2" />
+            <p className="text-[#A7BEB5] text-sm">Total System Revenue</p>
+            <p className="text-3xl font-bold text-white mt-1">{stats?.total_revenue?.toFixed(2) || '0.00'} TL</p>
+          </div>
         </div>
       </div>
     </div>

@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Zap, ChevronDown, User, Wallet, Car, LogOut } from 'lucide-react';
+import { Zap, ChevronDown, User, Wallet, Car, LogOut, Settings, Shield } from 'lucide-react';
 
 export function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
@@ -45,28 +45,44 @@ export function Navbar() {
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center gap-8">
+            {(!isAuthenticated || user?.role === 'driver') && (
+              <Link
+                href="/"
+                className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+              >
+                Map
+              </Link>
+            )}
             <Link
-              href="/"
+              href="/stations"
               className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
             >
-              Map
+              Stations
             </Link>
-            {isAuthenticated ? (
-              <>
-                <Link
-                  href="/reservations"
-                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-                >
-                  Reservations
-                </Link>
-                <Link
-                  href="/notifications"
-                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-                >
-                  Notifications
-                </Link>
-              </>
-            ) : null}
+            {isAuthenticated && user?.role === 'driver' && (
+              <Link
+                href="/reservations"
+                className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+              >
+                Reservations
+              </Link>
+            )}
+            {isAuthenticated && user?.role === 'operator' && (
+              <Link
+                href="/operator"
+                className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+              >
+                Operator Dashboard
+              </Link>
+            )}
+            {isAuthenticated && user?.role === 'admin' && (
+              <Link
+                href="/admin"
+                className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+              >
+                Admin Dashboard
+              </Link>
+            )}
           </div>
 
           {/* Auth Buttons */}
@@ -93,22 +109,26 @@ export function Navbar() {
                       <User className="w-4 h-4" />
                       Profile
                     </Link>
-                    <Link
-                      href="/wallet"
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-[#D9D5D2] hover:bg-[#062C24] hover:text-[#F2F2F0] transition-colors"
-                      onClick={() => setIsDropdownOpen(false)}
-                    >
-                      <Wallet className="w-4 h-4" />
-                      Wallet
-                    </Link>
-                    <Link
-                      href="/vehicles"
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-[#D9D5D2] hover:bg-[#062C24] hover:text-[#F2F2F0] transition-colors"
-                      onClick={() => setIsDropdownOpen(false)}
-                    >
-                      <Car className="w-4 h-4" />
-                      My Vehicles
-                    </Link>
+                    {user?.role === 'driver' && (
+                      <>
+                        <Link
+                          href="/wallet"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-[#D9D5D2] hover:bg-[#062C24] hover:text-[#F2F2F0] transition-colors"
+                          onClick={() => setIsDropdownOpen(false)}
+                        >
+                          <Wallet className="w-4 h-4" />
+                          Wallet
+                        </Link>
+                        <Link
+                          href="/vehicles"
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-[#D9D5D2] hover:bg-[#062C24] hover:text-[#F2F2F0] transition-colors"
+                          onClick={() => setIsDropdownOpen(false)}
+                        >
+                          <Car className="w-4 h-4" />
+                          My Vehicles
+                        </Link>
+                      </>
+                    )}
                     <div className="border-t border-[#4C736F]/30 my-2"></div>
                     <button
                       onClick={() => {

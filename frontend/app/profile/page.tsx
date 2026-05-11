@@ -130,16 +130,18 @@ export default function ProfilePage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button variant="ghost" className="text-[#D9D5D2] hover:text-[#F2F2F0]" onClick={() => router.push('/vehicles')}>
-              Manage Vehicles
-            </Button>
+            {user?.role === 'driver' && (
+              <Button variant="ghost" className="text-[#D9D5D2] hover:text-[#F2F2F0]" onClick={() => router.push('/vehicles')}>
+                Manage Vehicles
+              </Button>
+            )}
             <Button variant="ghost" className="text-[#D9D5D2] hover:text-[#F2F2F0]" onClick={handleLogout}>
               Logout
             </Button>
           </div>
         </div>
 
-        <div className="mt-8 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className={`mt-8 grid gap-6 ${user?.role === 'driver' ? 'xl:grid-cols-[1.05fr_0.95fr]' : 'max-w-2xl'}`}>
           <section className="rounded-[28px] border border-[#18423b]/80 bg-[#031712]/95 p-8 shadow-[0_24px_70px_rgba(0,0,0,0.25)]">
             <div className="flex items-center justify-between gap-4 border-b border-[#18423b]/80 pb-4">
               <div>
@@ -226,6 +228,7 @@ export default function ProfilePage() {
             </form>
           </section>
 
+          {user?.role === 'driver' && (
           <section className="rounded-[28px] border border-[#18423b]/80 bg-[#031712]/95 p-8 shadow-[0_24px_70px_rgba(0,0,0,0.25)]">
             <div className="flex items-center justify-between gap-4 border-b border-[#18423b]/80 pb-4">
               <div>
@@ -278,6 +281,7 @@ export default function ProfilePage() {
               </div>
             )}
           </section>
+          )}
         </div>
       </div>
     </div>

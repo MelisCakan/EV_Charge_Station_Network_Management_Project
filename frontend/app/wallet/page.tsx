@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Wallet as WalletIcon, ArrowUpCircle, ArrowDownCircle, RotateCcw } from 'lucide-react';
 
 export default function WalletPage() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
   const [wallet, setWallet] = useState<Wallet | null>(null);
@@ -23,10 +23,10 @@ export default function WalletPage() {
 
   useEffect(() => {
     if (isLoading) return;
-    if (!isAuthenticated) {
-      router.push('/auth/login');
+    if (!isAuthenticated || user?.role !== 'driver') {
+      router.push(user?.role === 'admin' ? '/admin' : user?.role === 'operator' ? '/operator' : '/auth/login');
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, user, router]);
 
   const loadWallet = async () => {
     try {
@@ -45,9 +45,9 @@ export default function WalletPage() {
   };
 
   useEffect(() => {
-    if (!isAuthenticated || isLoading) return;
+    if (!isAuthenticated || isLoading || user?.role !== 'driver') return;
     loadWallet();
-  }, [isAuthenticated, isLoading]);
+  }, [isAuthenticated, isLoading, user]);
 
   const handleTopup = async () => {
     const parsed = parseFloat(amount);

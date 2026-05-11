@@ -24,36 +24,6 @@ const powerRanges: Record<PowerFilter, [number, number]> = {
   high: [150, 1000],
 };
 
-const MOCK_STATIONS: MapStation[] = [
-  {
-    id: '101',
-    name: 'Seaside EV Hub',
-    location: { lat: 38.4300, lng: 27.1450 },
-    connector_types: ['CCS', 'Type2'],
-    power_output: 120,
-    pricing_per_kwh: 3.5,
-    status: 'available',
-  },
-  {
-    id: '102',
-    name: 'Downtown Fast Charge',
-    location: { lat: 38.4220, lng: 27.1410 },
-    connector_types: ['CHAdeMO', 'CCS'],
-    power_output: 50,
-    pricing_per_kwh: 2.8,
-    status: 'available',
-  },
-  {
-    id: '103',
-    name: 'Green Valley Station',
-    location: { lat: 38.4190, lng: 27.1500 },
-    connector_types: ['Type2'],
-    power_output: 22,
-    pricing_per_kwh: 2.2,
-    status: 'occupied',
-  },
-];
-
 function toMapStation(station: ChargingStation, chargers: Charger[]): MapStation {
   const connectorTypes = [...new Set(chargers.map(c => c.connector_type))] as Array<'CCS' | 'CHAdeMO' | 'Type2'>;
   const maxPower = chargers.length > 0 ? Math.max(...chargers.map(c => c.power_output)) : undefined;
@@ -114,14 +84,9 @@ export function MapView() {
           })
         );
         setStationChargers(chargersMap);
-        if (mapStations.length === 0) {
-          setStations(MOCK_STATIONS);
-        } else {
-          setStations(mapStations);
-        }
+        setStations(mapStations);
       } catch (err) {
         console.error("Failed to fetch stations:", handleApiError(err).message);
-        setStations(MOCK_STATIONS);
       }
     }
     fetchStations();
