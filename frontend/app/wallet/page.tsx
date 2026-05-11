@@ -91,7 +91,8 @@ export default function WalletPage() {
     }
   };
 
-  const formatDate = (value: string) => {
+  const formatDate = (value: string | undefined) => {
+    if (!value) return 'Unknown Date';
     return new Date(value).toLocaleString(undefined, {
       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
     });
@@ -172,7 +173,7 @@ export default function WalletPage() {
                     {txIcon(tx.type)}
                     <div>
                       <p className="text-sm font-medium text-white">{txLabel(tx.type)}</p>
-                      <p className="text-xs text-[#A7BEB5]">{formatDate(tx.timestamp)}</p>
+              <p className="text-xs text-[#A7BEB5]">{formatDate((tx as any).created_at || (tx as any).timestamp)}</p>
                     </div>
                   </div>
                   <p className={`text-lg font-semibold ${tx.amount >= 0 ? 'text-green-400' : 'text-red-400'}`}>

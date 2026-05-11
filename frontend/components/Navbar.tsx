@@ -1,13 +1,15 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Zap } from 'lucide-react';
+import { Zap, ChevronDown, User, Wallet, Car, LogOut } from 'lucide-react';
 
 export function Navbar() {
   const { user, logout, isAuthenticated } = useAuth();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
     try {
@@ -16,6 +18,16 @@ export function Navbar() {
       console.error('Logout error:', error);
     }
   };
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b border-[#4C736F]/10 bg-[#012623] shadow-sm">
@@ -48,30 +60,6 @@ export function Navbar() {
                   Reservations
                 </Link>
                 <Link
-                  href="/profile"
-                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-                >
-                  Profile
-                </Link>
-                <Link
-                  href="/wallet"
-                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-                >
-                  Wallet
-                </Link>
-                <Link
-                  href="/vehicles"
-                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-                >
-                  My Vehicles
-                </Link>
-                <Link
-                  href="/history"
-                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-                >
-                  History
-                </Link>
-                <Link
                   href="/notifications"
                   className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
                 >
@@ -84,18 +72,57 @@ export function Navbar() {
           {/* Auth Buttons */}
           <div className="flex items-center gap-4">
             {isAuthenticated ? (
-              <>
-                <span className="text-[#D9D5D2] text-sm hidden sm:inline">
-                  {user?.full_name}
-                </span>
-                <Button
-                  onClick={handleLogout}
-                  variant="ghost"
-                  className="text-[#D9D5D2] hover:text-[#F2F2F0] hover:bg-[#012623]"
+              <div className="relative" ref={dropdownRef}>
+                <button
+                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  className="flex items-center gap-2 text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors focus:outline-none"
                 >
-                  Logout
-                </Button>
-              </>
+                  <span className="text-sm font-medium hidden sm:inline">
+                    {user?.full_name}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 rounded-2xl bg-[#031712] border border-[#4C736F]/30 shadow-lg py-2 z-50">
+                    <Link
+                      href="/profile"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-[#D9D5D2] hover:bg-[#062C24] hover:text-[#F2F2F0] transition-colors"
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
+                      <User className="w-4 h-4" />
+                      Profile
+                    </Link>
+                    <Link
+                      href="/wallet"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-[#D9D5D2] hover:bg-[#062C24] hover:text-[#F2F2F0] transition-colors"
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
+                      <Wallet className="w-4 h-4" />
+                      Wallet
+                    </Link>
+                    <Link
+                      href="/vehicles"
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-[#D9D5D2] hover:bg-[#062C24] hover:text-[#F2F2F0] transition-colors"
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
+                      <Car className="w-4 h-4" />
+                      My Vehicles
+                    </Link>
+                    <div className="border-t border-[#4C736F]/30 my-2"></div>
+                    <button
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-sm text-[#D9D5D2] hover:bg-[#062C24] hover:text-[#F2F2F0] transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <>
                 <Link href="/auth/login">
