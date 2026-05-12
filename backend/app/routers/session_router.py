@@ -18,6 +18,30 @@ from app.services.session_service import SessionService
 router = APIRouter(prefix="/sessions", tags=["Charging Sessions"])
 
 
+@router.get("/by-reservation/{reservation_id}", response_model=SessionResponse)
+def get_session_by_reservation(
+    reservation_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """Reservation ID ile session bul (aktif sarj dashboard'a yonlendirme icin)."""
+    from app.models.charging_session import ChargingSession
+    from app.models.reservation import Reservation
+
+    reservation = session.get(Reservation, reservation_id)
+    if not reservation:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reservation not found")
+    if reservation.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not your reservation")
+
+    cs = session.exec(
+        select(ChargingSession).where(ChargingSession.reservation_id == reservation_id)
+    ).first()
+    if not cs:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No session found for this reservation")
+    return cs
+
+
 @router.post("/start", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
 def start_session(
     data: SessionStart,

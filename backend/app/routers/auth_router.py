@@ -95,6 +95,61 @@ def get_me(current_user: User = Depends(get_current_user)):
 
 
 # -------------------
+# UPDATE PROFILE
+# -------------------
+
+@router.put("/me")
+def update_me(data: dict, current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Kullanici profil bilgilerini gunceller."""
+    user = session.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if "full_name" in data and data["full_name"]:
+        user.full_name = data["full_name"]
+    if "phone_number" in data:
+        user.phone_number = data["phone_number"]
+    if "email" in data and data["email"]:
+        # Email degisiyorsa, baska kullanicida var mi kontrol et
+        if data["email"] != user.email:
+            existing = session.exec(select(User).where(User.email == data["email"])).first()
+            if existing:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already in use",
+                )
+            user.email = data["email"]
+
+    session.add(user)
+    session.commit()
+    session.refresh(user)
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "phone_number": user.phone_number,
+        "role": user.role,
+    }
+
+
+# -------------------
+# DELETE ACCOUNT
+# -------------------
+
+@router.delete("/me")
+def delete_me(current_user: User = Depends(get_current_user), session: Session = Depends(get_session)):
+    """Kullanici hesabini siler."""
+    user = session.get(User, current_user.id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    session.delete(user)
+    session.commit()
+    return {"message": "Account deleted successfully"}
+
+
+# -------------------
 # PASSWORD RESET REQUEST (REQ 1.17)
 # -------------------
 

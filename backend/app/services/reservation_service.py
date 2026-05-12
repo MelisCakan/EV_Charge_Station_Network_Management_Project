@@ -5,6 +5,10 @@ from sqlmodel import Session, select
 from app.models.reservation import Reservation
 from app.models.wallet import Wallet
 from app.models.charger import Charger
+from app.services.wallet_service import WalletService
+from app.repositories.wallet_repository import WalletRepository, TransactionRepository
+
+RESERVATION_FEE = 50.0
 
 
 class ReservationService:
@@ -28,10 +32,10 @@ class ReservationService:
         # RULE 2: Max 24 hours in advance
         now = datetime.utcnow()
         start = ReservationService._naive(data.start_time)
-        if start > now + timedelta(hours=24):
+        if start > now + timedelta(hours=72):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot reserve more than 24 hours in advance",
+                detail="Cannot reserve more than 72 hours in advance",
             )
 
         # Cannot reserve in the past
@@ -60,6 +64,10 @@ class ReservationService:
                 detail="This charger is already reserved for the selected time",
             )
 
+        # Deduct reservation fee from wallet (50 TL)
+        wallet_service = WalletService(WalletRepository(db), TransactionRepository(db))
+        wallet_service.deduct(user_id=user.id, amount=RESERVATION_FEE)
+
         # Create reservation
         reservation = Reservation(
             user_id=user.id,
@@ -69,7 +77,7 @@ class ReservationService:
             start_time=start,
             end_time=end_time,
             status="confirmed",
-            total_cost=None,
+            total_cost=RESERVATION_FEE,
         )
 
         db.add(reservation)

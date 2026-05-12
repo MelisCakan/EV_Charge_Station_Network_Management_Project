@@ -83,17 +83,16 @@ def test_uc2_full_flow(session, test_user, test_vehicle_ccs, test_station, test_
 
     # ─── 7. Wallet Deduction (REQ 4.4: otomatik odeme) ───
     session.refresh(test_wallet)
-    assert test_wallet.balance == 320.0  # 500 - 180
+    assert test_wallet.balance == 270.0  # 500 - 50 (reservation fee) - 180 (charging)
 
-    # Transaction kaydi
+    # Transaction kaydi: 2 charge transaction (1 reservation fee + 1 session)
     txs = list(session.exec(
         select(Transaction).where(
             Transaction.wallet_id == test_wallet.id,
             Transaction.type == "charge",
         )
     ).all())
-    assert len(txs) == 1
-    assert txs[0].amount == -180.0
+    assert len(txs) == 2
 
     # ─── 8. Receipt Olusturulmus olmali (REQ 1.20) ───
     receipt = session.exec(

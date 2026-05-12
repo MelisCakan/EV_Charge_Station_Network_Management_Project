@@ -53,19 +53,29 @@ export function Navbar() {
                 Map
               </Link>
             )}
-            <Link
-              href="/stations"
-              className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-            >
-              Stations
-            </Link>
-            {isAuthenticated && user?.role === 'driver' && (
+            {(!isAuthenticated || user?.role === 'driver') && (
               <Link
-                href="/reservations"
+                href="/stations"
                 className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
               >
-                Reservations
+                Stations
               </Link>
+            )}
+            {isAuthenticated && user?.role === 'driver' && (
+              <>
+                <Link
+                  href="/reservations"
+                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+                >
+                  Reservations
+                </Link>
+                <Link
+                  href="/notifications"
+                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+                >
+                  Notifications
+                </Link>
+              </>
             )}
             {isAuthenticated && user?.role === 'operator' && (
               <Link

@@ -54,7 +54,7 @@ class WalletService:
     # -------------------------
     # DEDUCT (UC2 Step 8, Req 4.4, 4.7)
     # -------------------------
-    def deduct(self, user_id: int, amount: float, session_id: int) -> Wallet:
+    def deduct(self, user_id: int, amount: float, session_id: int | None = None) -> Wallet:
         """
         REQ 4.4: Sarj tamamlaninca otomatik odeme.
         REQ 4.7: Yetersiz bakiye kontrolu.

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { APIProvider, Map, AdvancedMarker } from "@vis.gl/react-google-maps";
 import { LocateFixed } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,8 @@ function toMapStation(station: ChargingStation, chargers: Charger[]): MapStation
 
 export function MapView() {
   const { isAuthenticated } = useAuth();
+  const searchParams = useSearchParams();
+  const routeToHandled = useRef(false);
   const [mapCenter, setMapCenter] = useState<MapCoordinates>(DEFAULT_CENTER);
   const [userLocation, setUserLocation] = useState<MapCoordinates | null>(null);
   const [distances, setDistances] = useState<Record<string, number>>({});
@@ -153,7 +156,7 @@ export function MapView() {
     return stations.filter((station) => {
       const connectorMatch =
         selectedConnectors.length === 0
-          ? true
+          ? false
           : station.connector_types?.some((connector) => selectedConnectors.includes(connector)) ?? false;
       const powerMatch = station.power_output
         ? station.power_output >= minPower && station.power_output <= maxPower
@@ -212,6 +215,18 @@ export function MapView() {
     setSelectedStatuses(['available', 'occupied', 'offline']);
     setSelectedStation(null);
   };
+
+  // Handle ?route_to=station_id from reservations page
+  useEffect(() => {
+    const routeTo = searchParams.get("route_to");
+    if (!routeTo || !userLocation || stations.length === 0 || routeToHandled.current) return;
+    const target = stations.find((s) => s.id === routeTo);
+    if (target) {
+      routeToHandled.current = true;
+      setActiveRoute({ origin: userLocation, destination: target.location });
+      setMapCenter(target.location);
+    }
+  }, [searchParams, userLocation, stations]);
 
   useEffect(() => {
     if (selectedStation && !filteredStations.some((s) => s.id === selectedStation.id)) {

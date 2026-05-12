@@ -108,7 +108,7 @@ const normalizeAxiosError = (error: unknown): ApiError => {
   if (axios.isAxiosError(error)) {
     return {
       message:
-        error.response?.data?.message || error.message || 'API request failed',
+        error.response?.data?.detail || error.response?.data?.message || error.message || 'API request failed',
       status: error.response?.status,
       data: error.response?.data,
     };
@@ -148,24 +148,36 @@ export const apiClient = api;
 
 export const authApi = {
   login: async (payload: AuthPayload) => {
-    if (payload.password === 'demo123') {
-      if (payload.email === 'demo@evcharge.test') return { access_token: 'mock-token-driver', token_type: 'bearer' };
-      if (payload.email === 'operator@evcharge.test') return { access_token: 'mock-token-operator', token_type: 'bearer' };
-      if (payload.email === 'admin@evcharge.test') return { access_token: 'mock-token-admin', token_type: 'bearer' };
+    try {
+      const response = await api.post<LoginResponse>('/auth/login', payload);
+      return response.data;
+    } catch (error) {
+      // Fall back to mock tokens only when backend is unreachable (network error)
+      if (axios.isAxiosError(error) && !error.response && payload.password === 'demo123') {
+        if (payload.email === 'demo@evcharge.test') return { access_token: 'mock-token-driver', token_type: 'bearer' };
+        if (payload.email === 'operator@evcharge.test') return { access_token: 'mock-token-operator', token_type: 'bearer' };
+        if (payload.email === 'admin@evcharge.test') return { access_token: 'mock-token-admin', token_type: 'bearer' };
+      }
+      throw error;
     }
-    const response = await api.post<LoginResponse>('/auth/login', payload);
-    return response.data;
   },
   register: async (payload: SignupPayload) => {
-    if (payload.email.includes('evcharge.test')) {
-      return { message: 'Mock user registered', user_id: 1 };
+    try {
+      const response = await api.post<RegisterResponse>('/auth/register', payload);
+      return response.data;
+    } catch (error) {
+      if (axios.isAxiosError(error) && !error.response && payload.email.includes('evcharge.test')) {
+        return { message: 'Mock user registered', user_id: 1 };
+      }
+      throw error;
     }
-    const response = await api.post<RegisterResponse>('/auth/register', payload);
-    return response.data;
   },
   me: async () => {
     const token = getStoredToken();
-    if (token && MOCK_USERS[token]) return MOCK_USERS[token];
+    if (token && isMockToken(token)) {
+      // Mock tokens are not valid JWTs - backend would reject them
+      if (MOCK_USERS[token]) return MOCK_USERS[token];
+    }
     const response = await api.get('/auth/me');
     return response.data;
   },
@@ -297,30 +309,18 @@ let mockIssues: any[] = [
 export const stationApi = {
   list: async () => {
     if (isMockToken(getStoredToken())) return mockStations;
-    try {
-      const response = await api.get<ChargingStation[]>('/stations');
-      return response.data;
-    } catch (error) {
-      return mockStations; // Fallback so map works without backend
-    }
+    const response = await api.get<ChargingStation[]>('/stations');
+    return response.data;
   },
   details: async (stationId: string) => {
     if (isMockToken(getStoredToken())) return mockStations.find(s => String(s.id) === stationId) || mockStations[0];
-    try {
-      const response = await api.get<ChargingStation>(`/stations/${stationId}`);
-      return response.data;
-    } catch (error) {
-      return mockStations.find(s => String(s.id) === stationId) || mockStations[0];
-    }
+    const response = await api.get<ChargingStation>(`/stations/${stationId}`);
+    return response.data;
   },
-  chargers: async (stationId: string) => {
+  chargers: async (stationId: string | number) => {
     if (isMockToken(getStoredToken())) return mockChargers[stationId] || [];
-    try {
-      const response = await api.get<Charger[]>(`/stations/${stationId}/chargers`);
-      return response.data;
-    } catch (error) {
-      return mockChargers[stationId] || [];
-    }
+    const response = await api.get<Charger[]>(`/stations/${stationId}/chargers`);
+    return response.data;
   },
   reportIssue: async (payload: { station_id: number; charger_id: number; description: string }) => {
     if (isMockToken(getStoredToken())) {
@@ -328,7 +328,11 @@ export const stationApi = {
       mockIssues.push(issue);
       return issue;
     }
-    const response = await api.post('/issues', payload);
+    const response = await api.post('/issues', {
+      charger_id: payload.charger_id,
+      description: payload.description,
+      category: 'hardware',
+    });
     return response.data;
   },
 };
@@ -437,6 +441,10 @@ export const sessionApi = {
     const response = await api.post<ChargingSession>('/sessions/start', payload);
     return response.data;
   },
+  getByReservation: async (reservationId: number) => {
+    const response = await api.get(`/sessions/by-reservation/${reservationId}`);
+    return response.data;
+  },
   progress: async (sessionId: number) => {
     if (isMockToken(getStoredToken())) return { current_battery_level: 50, energy_consumed: 10, elapsed_minutes: 15, estimated_cost: 25.5 };
     const response = await api.get(`/sessions/${sessionId}/progress`);
@@ -505,7 +513,7 @@ export const operatorApi = {
       if (issue) issue.status = 'resolved';
       return { id: issueId, status: 'resolved' };
     }
-    const response = await api.put(`/issues/${issueId}/resolve`);
+    const response = await api.put(`/issues/${issueId}`, { status: 'resolved' });
     return response.data;
   }
 };

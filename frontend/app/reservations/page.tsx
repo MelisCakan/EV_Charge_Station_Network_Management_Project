@@ -4,9 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
-import { reservationApi, stationApi, handleApiError } from '@/lib/api';
+import { reservationApi, sessionApi, stationApi, handleApiError } from '@/lib/api';
 import { ChargingStation } from '@/lib/types';
-import { Calendar, Clock, MapPin, Plus, XCircle } from 'lucide-react';
+import { Calendar, Clock, MapPin, Plus, XCircle, Zap, Eye, Navigation } from 'lucide-react';
 
 interface Reservation {
   id: number;
@@ -27,6 +27,9 @@ export default function ReservationsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<number | null>(null);
+  const [startingCharge, setStartingCharge] = useState<number | null>(null);
+  const [batteryLevel, setBatteryLevel] = useState<string>('');
+  const [showBatteryModal, setShowBatteryModal] = useState<Reservation | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -47,8 +50,9 @@ export default function ReservationsPage() {
         ]);
         
         // Sort reservations by start_time descending (newest first)
-        const sortedReservations = resData.sort((a: Reservation, b: Reservation) => 
-          new Date(b.start_time).getTime() - new Date(a.start_time).getTime()
+        const utc = (ds: string) => ds.endsWith('Z') ? ds : ds + 'Z';
+        const sortedReservations = resData.sort((a: Reservation, b: Reservation) =>
+          new Date(utc(b.start_time)).getTime() - new Date(utc(a.start_time)).getTime()
         );
         
         setReservations(sortedReservations);
@@ -83,8 +87,42 @@ export default function ReservationsPage() {
     }
   };
 
+  const handleStartCharging = async (reservation: Reservation) => {
+    const level = parseFloat(batteryLevel);
+    if (isNaN(level) || level < 0 || level > 100) {
+      alert('Please enter a valid battery level (0-100).');
+      return;
+    }
+    setStartingCharge(reservation.id);
+    try {
+      const session = await sessionApi.start({
+        reservation_id: reservation.id,
+        start_battery_level: level,
+        charger_qr_code: reservation.charger_id,
+      });
+      setShowBatteryModal(null);
+      setBatteryLevel('');
+      router.push(`/charging/${session.id}`);
+    } catch (err) {
+      alert('Failed to start charging: ' + handleApiError(err).message);
+    } finally {
+      setStartingCharge(null);
+    }
+  };
+
+  const handleViewCharging = async (reservationId: number) => {
+    try {
+      const session = await sessionApi.getByReservation(reservationId);
+      router.push(`/charging/${session.id}`);
+    } catch (err) {
+      alert('Could not find active session: ' + handleApiError(err).message);
+    }
+  };
+
+  const toUTC = (ds: string) => ds.endsWith('Z') ? ds : ds + 'Z';
+
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString(undefined, {
+    return new Date(toUTC(dateString)).toLocaleString(undefined, {
       weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
     });
   };
@@ -132,7 +170,7 @@ export default function ReservationsPage() {
           ) : (
             reservations.map(reservation => {
               const isConfirmed = reservation.status === 'confirmed';
-              const isPast = new Date(reservation.start_time) < new Date();
+              const isPast = new Date(toUTC(reservation.start_time)) < new Date();
               const canCancel = isConfirmed && !isPast;
               
               return (
@@ -172,6 +210,36 @@ export default function ReservationsPage() {
                       <p className="text-xl font-bold text-white">{reservation.total_cost?.toFixed(2) || '0.00'} TL</p>
                     </div>
                     
+                    {isConfirmed && (
+                      <button
+                        onClick={() => { setShowBatteryModal(reservation); setBatteryLevel(''); }}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-[#6BC0A4]/40 bg-[#0B3E34]/80 px-4 py-2 text-sm font-medium text-[#6BC0A4] transition hover:bg-[#11614b] hover:text-white"
+                      >
+                        <Zap className="w-4 h-4" />
+                        Start Charging
+                      </button>
+                    )}
+
+                    {reservation.status === 'active' && (
+                      <button
+                        onClick={() => handleViewCharging(reservation.id)}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-[#70B4A6]/40 bg-[#062C24]/80 px-4 py-2 text-sm font-medium text-[#70B4A6] transition hover:bg-[#0B3E34] hover:text-white"
+                      >
+                        <Eye className="w-4 h-4" />
+                        View Charging
+                      </button>
+                    )}
+
+                    {(isConfirmed || reservation.status === 'active') && (
+                      <button
+                        onClick={() => router.push(`/?route_to=${reservation.station_id}`)}
+                        className="inline-flex items-center gap-2 rounded-2xl border border-[#4C736F]/40 bg-[#062C24]/80 px-4 py-2 text-sm font-medium text-[#4C736F] transition hover:bg-[#0B3E34] hover:text-white"
+                      >
+                        <Navigation className="w-4 h-4" />
+                        Rota Oluştur
+                      </button>
+                    )}
+
                     {canCancel && (
                       <button
                         onClick={() => handleCancel(reservation.id)}
@@ -188,6 +256,45 @@ export default function ReservationsPage() {
             })
           )}
         </div>
+
+        {/* Battery Level Modal */}
+        {showBatteryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <div className="w-full max-w-md rounded-[28px] border border-[#18423b]/80 bg-[#031712] p-8 shadow-2xl">
+              <h2 className="text-xl font-semibold text-white mb-2">Start Charging</h2>
+              <p className="text-sm text-[#A7BEB5] mb-6">
+                Charger #{showBatteryModal.charger_id} — Enter your current battery level to begin.
+              </p>
+              <label className="block text-sm font-medium text-[#D9D5D2] mb-2">
+                Current Battery Level (%)
+              </label>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={batteryLevel}
+                onChange={(e) => setBatteryLevel(e.target.value)}
+                placeholder="e.g. 20"
+                className="w-full rounded-xl border border-[#4C736F]/50 bg-[#062C24] px-4 py-3 text-white placeholder-[#A7BEB5]/50 focus:border-[#6BC0A4] focus:outline-none"
+              />
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => { setShowBatteryModal(null); setBatteryLevel(''); }}
+                  className="rounded-xl border border-[#4C736F]/40 px-5 py-2.5 text-sm text-[#D9D5D2] hover:bg-[#062C24] transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleStartCharging(showBatteryModal)}
+                  disabled={startingCharge === showBatteryModal.id}
+                  className="rounded-xl bg-[#6BC0A4] px-5 py-2.5 text-sm font-semibold text-[#000D0C] hover:bg-[#70B4A6] transition disabled:opacity-50"
+                >
+                  {startingCharge === showBatteryModal.id ? 'Starting...' : 'Start'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

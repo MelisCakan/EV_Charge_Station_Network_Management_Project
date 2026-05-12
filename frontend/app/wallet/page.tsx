@@ -93,7 +93,8 @@ export default function WalletPage() {
 
   const formatDate = (value: string | undefined) => {
     if (!value) return 'Unknown Date';
-    return new Date(value).toLocaleString(undefined, {
+    const utcVal = value.endsWith('Z') ? value : value + 'Z';
+    return new Date(utcVal).toLocaleString(undefined, {
       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
     });
   };

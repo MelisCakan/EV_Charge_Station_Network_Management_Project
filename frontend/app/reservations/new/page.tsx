@@ -15,31 +15,35 @@ function buildAvailableSlots(charger: Charger | null, reservations: any[] = []) 
   }
 
   const slots: Array<{ value: string; label: string; disabled?: boolean }> = [];
-  const now = new Date();
-  now.setMinutes(0, 0, 0);
-  now.setHours(now.getHours() + 1);
+  const realNow = new Date();
+  const startFrom = new Date(realNow);
+  startFrom.setMinutes(0, 0, 0);
+  startFrom.setHours(startFrom.getHours() + 1);
 
-  const endTime = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
-  let currentTime = new Date(now);
+  const endTime = new Date(startFrom.getTime() + 3 * 24 * 60 * 60 * 1000);
+  let currentTime = new Date(startFrom);
 
   while (currentTime <= endTime) {
     const slotStart = new Date(currentTime);
     const slotEnd = new Date(currentTime.getTime() + 60 * 60 * 1000);
+    const isPast = slotStart <= realNow;
 
     const isOccupied = reservations.some(r => {
-      const rStart = new Date(r.start_time);
+      const utc = (s: string) => s && !s.endsWith('Z') ? s + 'Z' : s;
+      const rStart = new Date(utc(r.start_time));
       const duration = r.duration_minutes || 60;
-      const rEnd = new Date(r.end_time || rStart.getTime() + duration * 60000);
+      const rEnd = new Date(r.end_time ? utc(r.end_time) : rStart.getTime() + duration * 60000);
       return (slotStart < rEnd && slotEnd > rStart);
     });
 
     const dayStr = slotStart.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
     const timeStr = slotStart.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const status = isPast ? 'Past' : isOccupied ? 'Occupied' : 'Available';
 
     slots.push({
       value: slotStart.toISOString(),
-      label: `${dayStr} ${timeStr} — ${isOccupied ? 'Occupied' : 'Available'}`,
-      disabled: isOccupied,
+      label: `${dayStr} ${timeStr} — ${status}`,
+      disabled: isPast || isOccupied,
     });
 
     currentTime.setHours(currentTime.getHours() + 1);
@@ -113,7 +117,7 @@ export default function NewReservationPage() {
     if (datetime) {
       const parsed = new Date(datetime);
       if (!Number.isNaN(parsed.getTime())) {
-        setSelectedSlot(parsed.toISOString().slice(0, 16));
+        setSelectedSlot(parsed.toISOString());
       }
     }
   }, [stations]);

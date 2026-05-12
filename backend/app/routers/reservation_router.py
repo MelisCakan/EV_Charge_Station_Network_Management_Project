@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.database import get_session
 from app.core.dependencies import get_current_user
 from app.models.user import User
+from app.models.reservation import Reservation
 from app.schemas.reservation_schema import ReservationCreate, ReservationResponse
 from app.services.reservation_service import ReservationService
 from app.services.compatibility_service import check_compatibility
@@ -46,6 +47,20 @@ def get_my_reservations(
         user_id=current_user.id,
         db=session,
     )
+
+
+@router.get("/charger/{charger_id}", response_model=list[ReservationResponse])
+def get_charger_reservations(
+    charger_id: int,
+    session: Session = Depends(get_session),
+):
+    """Bir charger'in confirmed rezervasyonlarini dondur (availability kontrolu icin)."""
+    return list(session.exec(
+        select(Reservation).where(
+            Reservation.charger_id == charger_id,
+            Reservation.status == "confirmed",
+        )
+    ).all())
 
 
 @router.delete("/{reservation_id}", status_code=status.HTTP_204_NO_CONTENT)
