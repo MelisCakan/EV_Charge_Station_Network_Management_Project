@@ -236,7 +236,7 @@ export default function ReservationsPage() {
                         className="inline-flex items-center gap-2 rounded-2xl border border-[#4C736F]/40 bg-[#062C24]/80 px-4 py-2 text-sm font-medium text-[#4C736F] transition hover:bg-[#0B3E34] hover:text-white"
                       >
                         <Navigation className="w-4 h-4" />
-                        Rota Oluştur
+                        Create Route
                       </button>
                     )}
 

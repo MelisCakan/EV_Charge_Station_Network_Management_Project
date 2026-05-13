@@ -1,6 +1,7 @@
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from app.models.notification import Notification
+from app.models.user import User
 from app.repositories.notification_repository import NotificationRepository
 
 
@@ -22,6 +23,17 @@ class NotificationService:
             type=notif_type,
         )
         return repo.create(notification)
+
+    # -------------------------
+    # SEND TO ALL USERS WITH A ROLE
+    # -------------------------
+    @staticmethod
+    def send_to_role(role: str, message: str, notif_type: str, db: Session) -> list[Notification]:
+        users = list(db.exec(select(User).where(User.role == role)).all())
+        results = []
+        for user in users:
+            results.append(NotificationService.send(user.id, message, notif_type, db))
+        return results
 
     # -------------------------
     # RESERVATION NOTIFICATION

@@ -6,6 +6,7 @@ from app.models.reservation import Reservation
 from app.models.wallet import Wallet
 from app.models.charger import Charger
 from app.services.wallet_service import WalletService
+from app.services.notification_service import NotificationService
 from app.repositories.wallet_repository import WalletRepository, TransactionRepository
 
 RESERVATION_FEE = 50.0
@@ -32,10 +33,10 @@ class ReservationService:
         # RULE 2: Max 24 hours in advance
         now = datetime.utcnow()
         start = ReservationService._naive(data.start_time)
-        if start > now + timedelta(hours=72):
+        if start > now + timedelta(hours=24):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot reserve more than 72 hours in advance",
+                detail="Cannot reserve more than 24 hours in advance",
             )
 
         # Cannot reserve in the past
@@ -83,6 +84,11 @@ class ReservationService:
         db.add(reservation)
         db.commit()
         db.refresh(reservation)
+
+        NotificationService.send_reservation_confirmed(
+            user_id=user.id, reservation_id=reservation.id, db=db,
+        )
+
         return reservation
 
     @staticmethod
@@ -149,6 +155,14 @@ class ReservationService:
         db.add(reservation)
         db.commit()
 
+        refund_pct = "100%" if time_until_start >= 30 else "80%"
+        NotificationService.send(
+            user_id=user_id,
+            message=f"Reservation #{reservation_id} cancelled. {refund_pct} refund issued.",
+            notif_type="reservation_cancel",
+            db=db,
+        )
+
     @staticmethod
     def check_noshow(reservation_id: int, db: Session):
         """
@@ -178,3 +192,10 @@ class ReservationService:
 
             db.add(reservation)
             db.commit()
+
+            NotificationService.send(
+                user_id=reservation.user_id,
+                message=f"Reservation #{reservation_id} marked as no-show. 50% penalty applied.",
+                notif_type="no_show",
+                db=db,
+            )

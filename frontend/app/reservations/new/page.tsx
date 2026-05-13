@@ -20,7 +20,7 @@ function buildAvailableSlots(charger: Charger | null, reservations: any[] = []) 
   startFrom.setMinutes(0, 0, 0);
   startFrom.setHours(startFrom.getHours() + 1);
 
-  const endTime = new Date(startFrom.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const endTime = new Date(startFrom.getTime() + 24 * 60 * 60 * 1000);
   let currentTime = new Date(startFrom);
 
   while (currentTime <= endTime) {

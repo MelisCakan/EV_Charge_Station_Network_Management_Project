@@ -18,7 +18,7 @@ function buildAvailableSlots(charger: Charger | null, reservations: any[] = []) 
   startFrom.setMinutes(0, 0, 0);
   startFrom.setHours(startFrom.getHours() + 1);
 
-  const endTime = new Date(startFrom.getTime() + 3 * 24 * 60 * 60 * 1000);
+  const endTime = new Date(startFrom.getTime() + 24 * 60 * 60 * 1000);
   let currentTime = new Date(startFrom);
 
   while (currentTime <= endTime) {
@@ -98,8 +98,8 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
     setCompatibility({
       is_compatible: isCompatible,
       message: isCompatible
-        ? "Bu araç seçili şarj cihazıyla uyumlu."
-        : `${vehicle.connector_type}, ${charger.connector_type} ile uyumlu değil.`,
+        ? "This vehicle is compatible with the selected charger."
+        : `${vehicle.connector_type} is not compatible with ${charger.connector_type}.`,
     });
   };
 
@@ -116,14 +116,14 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
     setCompatibility({
       is_compatible: isCompatible,
       message: isCompatible
-        ? "Bu şarj cihazı seçili araçla uyumlu."
-        : `${selectedVehicle.connector_type}, ${selected.connector_type} ile uyumlu değil.`,
+        ? "This charger is compatible with the selected vehicle."
+        : `${selectedVehicle.connector_type} is not compatible with ${selected.connector_type}.`,
     });
   };
 
   const handlePaymentSubmit = async () => {
     if (!selectedVehicle || !charger || !selectedSlot) {
-      setError("Lütfen tüm adımları tamamlayın.");
+      setError("Please complete all steps.");
       return;
     }
     setLoading(true);
@@ -149,10 +149,10 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
   const availableSlots = buildAvailableSlots(charger, chargerReservations);
 
   const steps = [
-    { step: "vehicle", label: "Araç", icon: Car },
-    { step: "datetime", label: "Saat", icon: Clock },
-    { step: "payment", label: "Ödeme", icon: WalletIcon },
-    { step: "confirmation", label: "Tamam", icon: CheckCircle },
+    { step: "vehicle", label: "Vehicle", icon: Car },
+    { step: "datetime", label: "Time", icon: Clock },
+    { step: "payment", label: "Payment", icon: WalletIcon },
+    { step: "confirmation", label: "Done", icon: CheckCircle },
   ];
 
   return (
@@ -162,7 +162,7 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
         {/* Header */}
         <div className="flex justify-between items-start mb-6">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-[#70B4A6] mb-1">Yeni Rezervasyon</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-[#70B4A6] mb-1">New Reservation</p>
             <h2 className="text-xl font-bold text-white">{station.name}</h2>
           </div>
           <button onClick={onClose} className="text-[#70B4A6] hover:text-white transition p-1">
@@ -201,10 +201,10 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
         {/* Step: Vehicle */}
         {currentStep === "vehicle" && (
           <div className="space-y-4">
-            <p className="text-sm text-[#D9D5D2]">Şarj etmek istediğiniz aracı seçin.</p>
+            <p className="text-sm text-[#D9D5D2]">Select the vehicle you want to charge.</p>
 
             {loading ? (
-              <p className="text-sm text-[#70B4A6]">Yükleniyor...</p>
+              <p className="text-sm text-[#70B4A6]">Loading...</p>
             ) : (
               <div className="space-y-3">
                 {vehicles.map((vehicle) => (
@@ -219,7 +219,7 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
                   >
                     <p className="font-semibold text-white">{vehicle.brand} {vehicle.model}</p>
                     <p className="text-xs text-[#D9D5D2]/80 mt-1">
-                      Plaka: {vehicle.plate_number} · {vehicle.connector_type}
+                      Plate: {vehicle.plate_number} · {vehicle.connector_type}
                     </p>
                   </div>
                 ))}
@@ -227,7 +227,7 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
             )}
 
             <div>
-              <label className="block text-sm font-medium text-[#D9D5D2] mb-2">Şarj Cihazı</label>
+              <label className="block text-sm font-medium text-[#D9D5D2] mb-2">Charger</label>
               <select
                 value={charger?.id ?? ""}
                 onChange={(e) => {
@@ -236,7 +236,7 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
                 }}
                 className="w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] text-sm outline-none focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20"
               >
-                <option value="">Şarj cihazı seçin</option>
+                <option value="">Select a charger</option>
                 {chargers.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.charger_code} — {c.connector_type} · {c.power_output} kW ({c.status})
@@ -261,7 +261,7 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
               disabled={!selectedVehicle || !charger || !compatibility?.is_compatible}
               className="w-full rounded-2xl bg-[#4C736F] px-4 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Müsait Saatlere Geç
+              Continue to Available Slots
             </button>
           </div>
         )}
@@ -270,21 +270,21 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
         {currentStep === "datetime" && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-[#13423a]/80 bg-[#031912]/95 p-4 text-sm text-[#D9D5D2]">
-              <p>İstasyon: <span className="text-white">{station.name}</span></p>
-              <p className="mt-1">Cihaz: <span className="text-white">{charger?.charger_code}</span></p>
+              <p>Station: <span className="text-white">{station.name}</span></p>
+              <p className="mt-1">Charger: <span className="text-white">{charger?.charger_code}</span></p>
             </div>
 
             {availableSlots.length === 0 ? (
-              <p className="text-sm text-[#F2D1D1]">Bu cihaz için müsait slot bulunamadı.</p>
+              <p className="text-sm text-[#F2D1D1]">No available slots found for this charger.</p>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-[#D9D5D2] mb-2">Saat Seçimi</label>
+                <label className="block text-sm font-medium text-[#D9D5D2] mb-2">Select Time</label>
                 <select
                   value={selectedSlot}
                   onChange={(e) => setSelectedSlot(e.target.value)}
                   className="w-full rounded-2xl border border-[#4C736F] bg-[#0A2E23] px-4 py-3 text-[#F2F2F0] text-sm outline-none focus:border-[#6BC0A4] focus:ring-2 focus:ring-[#6BC0A4]/20"
                 >
-                  <option value="" disabled>Lütfen bir saat seçin</option>
+                  <option value="" disabled>Please select a time slot</option>
                   {availableSlots.map((slot) => (
                     <option key={slot.value} value={slot.value} disabled={slot.disabled}>
                       {slot.label}
@@ -301,7 +301,7 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
                 disabled={!selectedSlot}
                 className="rounded-2xl bg-[#4C736F] px-6 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Ödemeye Geç
+                Continue to Payment
               </button>
             </div>
           </div>
@@ -311,28 +311,28 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
         {currentStep === "payment" && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-[#13423a]/80 bg-[#031912]/95 p-4 text-sm text-[#D9D5D2]">
-              <p>İstasyon: <span className="text-white">{station.name}</span></p>
-              <p className="mt-1">Cihaz: <span className="text-white">{charger?.charger_code}</span></p>
-              <p className="mt-1">Araç: <span className="text-white">{selectedVehicle?.brand} {selectedVehicle?.model}</span></p>
+              <p>Station: <span className="text-white">{station.name}</span></p>
+              <p className="mt-1">Charger: <span className="text-white">{charger?.charger_code}</span></p>
+              <p className="mt-1">Vehicle: <span className="text-white">{selectedVehicle?.brand} {selectedVehicle?.model}</span></p>
               <p className="mt-1">Slot: <span className="text-white">{selectedSlot ? formatSlot(selectedSlot) : ""}</span></p>
             </div>
 
             <div className="mt-6 rounded-2xl border border-[#4C736F] bg-[#0A2E23] p-6 text-center shadow-lg">
-              <p className="text-sm font-medium text-[#D9D5D2]">Cüzdan Bakiyeniz</p>
+              <p className="text-sm font-medium text-[#D9D5D2]">Your Wallet Balance</p>
               <p className="mt-2 text-4xl font-bold text-white">{wallet?.balance?.toFixed(2) || '0.00'} <span className="text-xl text-[#A7BEB5]">TL</span></p>
               <div className="mt-6 border-t border-[#13423a]/80 pt-6">
-                <p className="text-sm font-medium text-[#D9D5D2]">Rezervasyon Ücreti</p>
+                <p className="text-sm font-medium text-[#D9D5D2]">Reservation Fee</p>
                 <p className="mt-2 text-2xl font-bold text-[#6BC0A4]">50.00 TL</p>
               </div>
             </div>
 
             {(wallet?.balance ?? 0) < 50 ? (
               <div className="mt-4 rounded-xl border border-[#D45D5D]/40 bg-[#3F1818]/50 p-4 text-center text-sm text-[#F2D1D1]">
-                Yetersiz bakiye. Lütfen devam etmek için cüzdanınıza para yükleyin.
+                Insufficient balance. Please top up your wallet to continue.
               </div>
             ) : (
               <button type="button" onClick={handlePaymentSubmit} disabled={loading} className="w-full mt-2 rounded-2xl bg-[#4C736F] px-4 py-3 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4] disabled:opacity-50 disabled:cursor-not-allowed">
-                {loading ? "İşleniyor..." : "Cüzdandan 50.00 TL Öde"}
+                {loading ? "Processing..." : "Pay 50.00 TL from Wallet"}
               </button>
             )}
           </div>
@@ -342,15 +342,15 @@ export function ReservationModal({ station, onSuccess, onClose }: ReservationMod
         {currentStep === "confirmation" && (
           <div className="text-center py-8 space-y-4">
             <CheckCircle className="mx-auto h-16 w-16 text-[#6BC0A4]" />
-            <h3 className="text-xl font-bold text-white">Rezervasyon Tamamlandı!</h3>
+            <h3 className="text-xl font-bold text-white">Reservation Completed!</h3>
             <p className="text-sm text-[#D9D5D2]/80">
-              Rezervasyonunuz onaylandı. Haritada rotanız gösterilecek.
+              Your reservation is confirmed. Your route will be shown on the map.
             </p>
             <button
               onClick={onSuccess}
               className="mt-4 inline-flex h-12 items-center justify-center rounded-2xl bg-[#4C736F] px-8 text-sm font-semibold text-[#F2F2F0] transition hover:bg-[#6BC0A4]"
             >
-              Rotayı Göster
+              Show Route
             </button>
           </div>
         )}

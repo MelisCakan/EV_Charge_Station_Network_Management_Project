@@ -63,7 +63,7 @@ export function RouteDisplay({ origin, destination, onClose }: RouteDisplayProps
             });
           }
         } else {
-          console.error("Directions API hatası:", status);
+          console.error("Directions API error:", status);
         }
       }
     );
@@ -89,7 +89,7 @@ export function RouteDisplay({ origin, destination, onClose }: RouteDisplayProps
     >
       {routeInfo && (
         <span style={{ color: "#D9D5D2", fontWeight: 500 }}>
-          {routeInfo.distanceKm.toFixed(1)} km · {routeInfo.durationMinutes} dk
+          {routeInfo.distanceKm.toFixed(1)} km · {routeInfo.durationMinutes} min
         </span>
       )}
       <button
@@ -104,7 +104,7 @@ export function RouteDisplay({ origin, destination, onClose }: RouteDisplayProps
           padding: 0,
         }}
       >
-        ✕ Rotayı Kapat
+        ✕ Close Route
       </button>
     </div>
   );

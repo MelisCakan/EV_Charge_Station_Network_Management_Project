@@ -7,6 +7,8 @@ from app.models.user import User
 from app.models.issue_report import IssueReport
 from app.models.maintenance_note import MaintenanceNote
 from app.models.charger import Charger
+from app.models.station import ChargingStation
+from app.services.notification_service import NotificationService
 from app.schemas.issue_schema import (
     IssueCreateRequest,
     IssueUpdateRequest,
@@ -47,6 +49,16 @@ def create_issue(
     session.add(issue)
     session.commit()
     session.refresh(issue)
+
+    # Notify operators and admins about the new issue
+    station = None
+    if charger.station_id:
+        station = session.get(ChargingStation, charger.station_id)
+    station_name = station.name if station else f"Station #{charger.station_id}"
+    msg = f"New {data.category} issue reported: \"{data.description}\" — {charger.charger_code} at {station_name}"
+    NotificationService.send_to_role("operator", msg, "issue_reported", session)
+    NotificationService.send_to_role("admin", msg, "issue_reported", session)
+
     return issue
 
 
@@ -82,10 +94,29 @@ def update_issue_status(
             detail="Invalid status. Must be: open, in_progress, resolved",
         )
 
+    old_status = issue.status
     issue.status = data.status
     session.add(issue)
     session.commit()
     session.refresh(issue)
+
+    # Notify the driver who reported the issue
+    if issue.user_id:
+        NotificationService.send(
+            user_id=issue.user_id,
+            message=f"Your issue #{issue_id} status changed from {old_status} to {data.status}.",
+            notif_type="issue_update",
+            db=session,
+        )
+
+    # Notify admins about the status change
+    NotificationService.send_to_role(
+        "admin",
+        f"Issue #{issue_id} status changed to {data.status} by operator.",
+        "issue_update",
+        session,
+    )
+
     return issue
 
 

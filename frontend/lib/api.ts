@@ -528,4 +528,22 @@ export const adminApi = {
   }
 };
 
+export const notificationApi = {
+  list: async () => {
+    if (isMockToken(getStoredToken())) return [];
+    const response = await api.get('/notifications');
+    return response.data;
+  },
+  unread: async () => {
+    if (isMockToken(getStoredToken())) return [];
+    const response = await api.get('/notifications/unread');
+    return response.data;
+  },
+  markRead: async (notificationId: number) => {
+    if (isMockToken(getStoredToken())) return {};
+    const response = await api.put(`/notifications/${notificationId}/read`);
+    return response.data;
+  },
+};
+
 export const handleApiError = (error: unknown): ApiError => normalizeAxiosError(error);

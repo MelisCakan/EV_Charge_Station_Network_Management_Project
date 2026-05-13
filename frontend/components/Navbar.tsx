@@ -62,20 +62,12 @@ export function Navbar() {
               </Link>
             )}
             {isAuthenticated && user?.role === 'driver' && (
-              <>
-                <Link
-                  href="/reservations"
-                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-                >
-                  Reservations
-                </Link>
-                <Link
-                  href="/notifications"
-                  className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
-                >
-                  Notifications
-                </Link>
-              </>
+              <Link
+                href="/reservations"
+                className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+              >
+                Reservations
+              </Link>
             )}
             {isAuthenticated && user?.role === 'operator' && (
               <Link
@@ -91,6 +83,14 @@ export function Navbar() {
                 className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
               >
                 Admin Dashboard
+              </Link>
+            )}
+            {isAuthenticated && (
+              <Link
+                href="/notifications"
+                className="text-[#D9D5D2] hover:text-[#F2F2F0] transition-colors font-medium"
+              >
+                Notifications
               </Link>
             )}
           </div>

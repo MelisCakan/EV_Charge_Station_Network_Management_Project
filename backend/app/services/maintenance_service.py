@@ -71,6 +71,14 @@ class MaintenanceService:
 
         db.commit()
 
+        # Notify admins about charger going offline
+        NotificationService.send_to_role(
+            "admin",
+            f"Charger #{charger_id} ({charger.charger_code}) marked offline. {cancelled_count} reservation(s) cancelled.",
+            "maintenance",
+            db,
+        )
+
         return {
             "charger_id": charger_id,
             "new_status": "offline",
@@ -95,6 +103,14 @@ class MaintenanceService:
         charger.status = "available"
         db.add(charger)
         db.commit()
+
+        # Notify admins about charger coming back online
+        NotificationService.send_to_role(
+            "admin",
+            f"Charger #{charger_id} ({charger.charger_code}) is back online.",
+            "maintenance",
+            db,
+        )
 
         return {
             "charger_id": charger_id,
